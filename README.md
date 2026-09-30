@@ -1,2 +1,1 @@
-# Garnet
-All-in-one discord bot
+What am I supposed to add here e?
