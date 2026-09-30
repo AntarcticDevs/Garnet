@@ -1,0 +1,121 @@
+package database;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class Database {
+
+    private static final String URL = "jdbc:sqlite:garnet.db";
+
+    public static Connection getConnection() throws SQLException {
+        Connection connection = DriverManager.getConnection(URL);
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA foreign_keys = ON");
+        }
+        return connection;
+    }
+    public static void initialize() throws SQLException {
+        try (Connection connection = getConnection();
+            Statement statement = connection.createStatement()) {
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS embeds (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        guild_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        title TEXT,
+                        description TEXT,
+                        footer_text TEXT,
+                        footer_image TEXT,
+                        image_url TEXT,
+                        author_text TEXT,
+                        author_image TEXT,
+                        colour TEXT,
+                        thumbnail_url TEXT
+                    )
+                    """);
+
+            addColumnIfMissing(connection, "embeds", "title TEXT");
+            addColumnIfMissing(connection, "embeds", "description TEXT");
+            addColumnIfMissing(connection, "embeds", "footer_text TEXT");
+            addColumnIfMissing(connection, "embeds", "footer_image TEXT");
+            addColumnIfMissing(connection, "embeds", "image_url TEXT");
+            addColumnIfMissing(connection, "embeds", "author_text TEXT");
+            addColumnIfMissing(connection, "embeds", "author_image TEXT");
+            addColumnIfMissing(connection, "embeds", "colour TEXT");
+            addColumnIfMissing(connection, "embeds", "thumbnail_url TEXT");
+            
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS embed_fields (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        embed_id INTEGER NOT NULL,
+                        field_name TEXT NOT NULL,
+                        field_value TEXT NOT NULL,
+                        field_position INTEGER NOT NULL,
+                        is_inline INTEGER NOT NULL DEFAULT 0,
+                        FOREIGN KEY (embed_id) REFERENCES embeds(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS guild_rules (
+                        guild_id TEXT PRIMARY KEY,
+                        embed_id INTEGER NOT NULL,
+                        FOREIGN KEY (embed_id) REFERENCES embeds(id) ON DELETE CASCADE
+                    )
+                    """);
+
+                statement.execute("""
+                    CREATE TABLE IF NOT EXISTS guild_rule_embeds (
+                    guild_id TEXT NOT NULL,
+                    position INTEGER NOT NULL,
+                    embed_id INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, position),
+                    UNIQUE (guild_id, embed_id),
+                    FOREIGN KEY (embed_id) REFERENCES embeds(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                CREATE TABLE IF NOT EXISTS welcomer (
+                    guild_id TEXT PRIMARY KEY,
+                    channel_id TEXT,
+                    embed_id INTEGER
+                )
+                    """);
+            addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
+
+                statement.execute("""
+                    INSERT OR IGNORE INTO guild_rule_embeds (guild_id, position, embed_id)
+                    SELECT guild_id, 1, embed_id FROM guild_rules
+                    """);
+        }
+    }
+
+    private static void addColumnIfMissing(Connection connection, String tableName, String columnDefinition) throws SQLException {
+        String columnName = columnDefinition.substring(0, columnDefinition.indexOf(' '));
+        String tableInfoSql = "PRAGMA table_info(" + tableName + ")";
+        boolean columnExists = false;
+
+        try (Statement statement = connection.createStatement();
+             ResultSet resultSet = statement.executeQuery(tableInfoSql)) {
+            while (resultSet.next()) {
+                if (columnName.equals(resultSet.getString("name"))) {
+                    columnExists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!columnExists) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnDefinition);
+            }
+        }
+    }
+
+}
