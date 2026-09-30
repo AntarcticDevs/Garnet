@@ -68,7 +68,7 @@ public class TicketManager {
             return "TICKET_CLOSED";
         }
 
-        if ("CLAIMED".equals(ticket.state)) {
+        if ("CLAIMED".equals(ticket.claimState)) {
             return "ALREADY_CLAIMED";
         }
 
