@@ -225,4 +225,36 @@ public class Database {
             }
     }
 
+
+    public static void deleteTicketByChannelId(String channelId) throws SQLException {
+
+        String sql = """
+                DELETE FROM tickets
+                WHERE channel_id = ?
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, channelId);
+            statement.executeUpdate();
+        }
+    }
+
+
+    public static void deleteTicketById(int ticketId) throws SQLException {
+
+        String sql = """
+                DELETE FROM tickets
+                WHERE id = ?
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setInt(1, ticketId);
+            statement.executeUpdate();
+        }
+    }
+
 }
