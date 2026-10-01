@@ -29,7 +29,7 @@ public class Main {
 
         public static void main(String[] args) throws InterruptedException {
         // String token = System.getenv("DISCORD_TOKEN");
-        String token = "MTU1MDA3NDA4NDQ1MTI5MTE1Ng.GM13Gl.MtP7-eEZrLvP7i9W_GNxqO_DZpYa2lB_87lPdY"; //temporary
+        String token = ""; //temporary
 
         if (token == null || token.isBlank()) {
             throw new IllegalStateException("DISCORD_TOKEN environment variable is not set");
