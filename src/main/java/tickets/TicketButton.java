@@ -15,13 +15,24 @@ public class TicketButton extends ListenerAdapter {
             return;
         }
 
+        if (!event.getButton().getCustomId().equals("ticket:support")) {
+            return;
+        }
+
+        event.deferReply(true).queue();
+
         TicketManager manager = new TicketManager();
 
-        String id = event.getButton().getCustomId();
+        Member member = event.getMember();
 
-        if (id.equals("ticket:support")) {
-            Member member = event.getMember();
-            manager.createTicket(event.getGuild(), member, null); // Work in progress
-        }
+        TicketData ticket = manager.createTicket(
+                event.getGuild(),
+                member,
+                null
+        );
+
+        event.getHook().editOriginal(
+                "Ticket created: <#" + ticket.channelId + ">"
+        ).queue();
     }
 }
