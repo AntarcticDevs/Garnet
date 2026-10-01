@@ -95,12 +95,21 @@ public class Database {
                     """);
 
             statement.execute("""
+                CREATE TABLE IF NOT EXISTS ticket_config (
+                    guild_id TEXT PRIMARY KEY,
+                    category_id TEXT
+                )
+                    """);
+
+
+            statement.execute("""
                 CREATE TABLE IF NOT EXISTS welcomer (
                     guild_id TEXT PRIMARY KEY,
                     channel_id TEXT,
                     embed_id INTEGER
                 )
                     """);
+
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
 
                 statement.execute("""
@@ -255,6 +264,47 @@ public class Database {
             statement.setInt(1, ticketId);
             statement.executeUpdate();
         }
+    }
+
+
+    public static void saveTicketCategory(String guildId, String categoryId) throws SQLException {
+        String sql = """
+            INSERT INTO ticket_config (guild_id, category_id)
+            VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET category_id = excluded.category_id
+            """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, guildId);
+            statement.setString(2, categoryId);
+
+            statement.executeUpdate();
+        }
+    }
+
+
+    public static String getTicketCategory(String guildId) throws SQLException {
+        String sql = """
+            SELECT category_id
+            FROM ticket_config
+            WHERE guild_id = ?
+            """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, guildId);
+
+            try (ResultSet result = statement.executeQuery()) {
+                if (result.next()) {
+                    return result.getString("category_id");
+                }
+            }
+        }
+
+        return null;
     }
 
 }
