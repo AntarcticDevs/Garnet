@@ -2,10 +2,11 @@ package tickets;
 
 public class TicketData {
 
-    String channelId;
-    String creatorId;
-    String state;
-    String claimerId;
-    String claimState;
+    public int id;
+    public String channelId;
+    public String creatorId;
+    public String state;
+    public String claimerId;
+    public String claimState;
 
 }
