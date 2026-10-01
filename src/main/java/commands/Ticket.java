@@ -31,7 +31,7 @@ public class Ticket extends ListenerAdapter implements Command {
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!"ticket".equals(event.getName())) {
+        if ("ticket".equals(event.getName())) {
             return;
         }
 
@@ -49,9 +49,9 @@ public class Ticket extends ListenerAdapter implements Command {
             return;
         }
 
-        if (!"send-panel".equals(event.getSubcommandName())) {
-            return;
-        }
+        if ("send-panel".equals(event.getSubcommandName())) {
+
+        
 
         OptionMapping channelOption = event.getOption("channel");
         TextChannel channel;
@@ -79,5 +79,9 @@ public class Ticket extends ListenerAdapter implements Command {
                                 .queue()
                 )
         );
+
+    } else if ("set-category".equals(event.getSubcommandName())) {
+        
     }
+}
 }
