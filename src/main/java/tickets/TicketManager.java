@@ -25,6 +25,8 @@ public class TicketManager {
 
         ticket.channelId = channel.getId();
         ticket.creatorId = member.getId();
+        ticket.state = "OPEN";
+        ticket.claimState = "UNCLAIMED";
 
         try {
             Database.saveTicket(ticket);
