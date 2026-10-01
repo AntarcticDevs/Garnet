@@ -8,8 +8,10 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.EmbedBuilder;
 
 import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.requests.restaction.ChannelAction;
 
 import java.sql.SQLException;
+import java.util.EnumSet;
 
 import database.Database;
 
@@ -20,31 +22,34 @@ public class TicketManager {
     public TicketData createTicket(Guild guild, Member member, String categoryID) {
         TicketData ticket = new TicketData();
 
-        TextChannel channel;
+        Category category = categoryID == null ? null : guild.getCategoryById(categoryID);
 
-        if (categoryID == null) {
-            channel = guild.createTextChannel("ticket-" + member.getUser().getName()).complete();
-        } else {
-            Category category = guild.getCategoryById(categoryID);
+        String channelName = category == null
+                ? "ticket-" + member.getUser().getName()
+                : member.getUser().getName() + " ticket";
+        ChannelAction<TextChannel> channelAction = category == null
+                ? guild.createTextChannel(channelName)
+                : guild.createTextChannel(channelName, category);
 
-            if (category == null) {
-                channel = guild.createTextChannel("ticket-" + member.getUser().getName()).complete();
-            } else {
-                channel = guild.createTextChannel(
-                        member.getUser().getName() + " ticket",
-                        category
-                ).complete();
-            }
-        }
+        channelAction.addPermissionOverride(
+                guild.getPublicRole(),
+                null,
+                EnumSet.of(Permission.VIEW_CHANNEL)
+        );
+        channelAction.addPermissionOverride(
+                member,
+                EnumSet.of(
+                        Permission.VIEW_CHANNEL,
+                        Permission.MESSAGE_SEND,
+                        Permission.MESSAGE_ATTACH_FILES,
+                        Permission.MESSAGE_EMBED_LINKS,
+                        Permission.MESSAGE_ADD_REACTION,
+                        Permission.MESSAGE_HISTORY
+                ),
+                null
+        );
 
-        channel.upsertPermissionOverride(member).grant(
-                Permission.VIEW_CHANNEL,
-                Permission.MESSAGE_SEND,
-                Permission.MESSAGE_ATTACH_FILES,
-                Permission.MESSAGE_EMBED_LINKS,
-                Permission.MESSAGE_ADD_REACTION,
-                Permission.MESSAGE_HISTORY
-        ).complete();
+        TextChannel channel = channelAction.complete();
 
         ticket.channelId = channel.getId();
         ticket.creatorId = member.getId();
