@@ -9,6 +9,11 @@ import net.dv8tion.jda.api.EmbedBuilder;
 
 import net.dv8tion.jda.api.Permission;
 
+import java.sql.SQLException;
+
+import database.Database;
+
+
 
 public class TicketManager {
 
@@ -20,6 +25,13 @@ public class TicketManager {
 
         ticket.channelId = channel.getId();
         ticket.creatorId = member.getId();
+
+        try {
+            Database.saveTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+}
+
         return  ticket;
     }
 
@@ -39,6 +51,12 @@ public class TicketManager {
         
         ticket.state = "CLOSED";
 
+        try {
+            Database.updateTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         channel.upsertPermissionOverride(creator).deny(Permission.MESSAGE_SEND).queue();
 
         channel.sendMessageEmbeds(embed.build()).queue();
@@ -55,6 +73,12 @@ public class TicketManager {
         Member creator = guild.getMemberById(creatorID);
 
         ticket.state = "OPEN";
+
+        try {
+            Database.updateTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
         channel.upsertPermissionOverride(creator).grant(Permission.MESSAGE_SEND).queue();
         channel.sendMessageEmbeds(embed.build()).queue();
@@ -75,6 +99,12 @@ public class TicketManager {
         ticket.claimerId = claimerID;
         ticket.claimState = "CLAIMED";
 
+        try {
+            Database.updateTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         channel.sendMessageEmbeds(embed.build()).queue();
 
         return "SUCCESS";
@@ -94,6 +124,12 @@ public class TicketManager {
 
         ticket.claimerId = null;
         ticket.claimState = "UNCLAIMED";
+
+        try {
+            Database.updateTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
         channel.sendMessageEmbeds(embed.build()).queue();
 
@@ -116,6 +152,13 @@ public class TicketManager {
         }
 
         ticket.claimerId = claimerID;
+
+        try {
+            Database.updateTicket(ticket);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         channel.sendMessageEmbeds(embed.build()).queue();
 
         return "SUCCESS";
