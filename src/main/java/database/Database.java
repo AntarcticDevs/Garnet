@@ -6,6 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import java.sql.PreparedStatement;
+import tickets.TicketData;
+
 public class Database {
 
     private static final String URL = "jdbc:sqlite:garnet.db";
@@ -58,6 +61,17 @@ public class Database {
                         field_position INTEGER NOT NULL,
                         is_inline INTEGER NOT NULL DEFAULT 0,
                         FOREIGN KEY (embed_id) REFERENCES embeds(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS tickets (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        channel_id TEXT,
+                        creator_id TEXT,
+                        state TEXT,
+                        claimer_id TEXT,
+                        claim_state TEXT
                     )
                     """);
 
@@ -115,6 +129,67 @@ public class Database {
             try (Statement statement = connection.createStatement()) {
                 statement.execute("ALTER TABLE " + tableName + " ADD COLUMN " + columnDefinition);
             }
+        }
+    }
+
+
+    public static void saveTicket(TicketData ticket) throws SQLException {
+
+        String sql = """
+                INSERT INTO tickets (
+                    channel_id,
+                    creator_id,
+                    state,
+                    claimer_id,
+                    claim_state
+                )
+                VALUES (?, ?, ?, ?, ?)
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            statement.setString(1, ticket.channelId);
+            statement.setString(2, ticket.creatorId);
+            statement.setString(3, ticket.state);
+            statement.setString(4, ticket.claimerId);
+            statement.setString(5, ticket.claimState);
+
+            statement.executeUpdate();
+
+        try (ResultSet resultSet = statement.getGeneratedKeys()) {
+            if (resultSet.next()) {
+                ticket.id = resultSet.getInt(1);
+            }
+        }
+        }
+    }
+
+
+    public static void updateTicket(TicketData ticket) throws SQLException {
+
+        String sql = """
+                UPDATE tickets
+                SET
+                    channel_id = ?,
+                    creator_id = ?,
+                    state = ?,
+                    claimer_id = ?,
+                    claim_state = ?
+                WHERE id = ?
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, ticket.channelId);
+            statement.setString(2, ticket.creatorId);
+            statement.setString(3, ticket.state);
+            statement.setString(4, ticket.claimerId);
+            statement.setString(5, ticket.claimState);
+            statement.setInt(6, ticket.id);
+
+            statement.executeUpdate();
         }
     }
 
