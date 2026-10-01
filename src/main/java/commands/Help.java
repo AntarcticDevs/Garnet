@@ -47,7 +47,7 @@ public class Help extends ListenerAdapter implements Command {
         event.replyEmbeds(embed.build())
             .addComponents(ActionRow.of(
                 Button.link("https://github.com/EnderKnight7op", "💻 GitHub"),
-                Button.link("https://dsc.gg/enderlabs", "🤝 Discord Server")))
+                Button.link("https://dsc.gg/garnetbot", "🤝 Discord Server")))
             .queue();
     }
 }
