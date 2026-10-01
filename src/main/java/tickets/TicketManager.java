@@ -19,9 +19,23 @@ public class TicketManager {
 
     public TicketData createTicket(Guild guild, Member member, String categoryID) {
         TicketData ticket = new TicketData();
-        Category category = guild.getCategoryById(categoryID);
 
-        TextChannel channel = guild.createTextChannel(member.getUser().getName() + " ticket", category).complete();
+        TextChannel channel;
+
+        if (categoryID == null) {
+            channel = guild.createTextChannel("ticket-" + member.getUser().getName()).complete();
+        } else {
+            Category category = guild.getCategoryById(categoryID);
+
+            if (category == null) {
+                channel = guild.createTextChannel("ticket-" + member.getUser().getName()).complete();
+            } else {
+                channel = guild.createTextChannel(
+                        member.getUser().getName() + " ticket",
+                        category
+                ).complete();
+            }
+        }
 
         ticket.channelId = channel.getId();
         ticket.creatorId = member.getId();
@@ -32,9 +46,9 @@ public class TicketManager {
             Database.saveTicket(ticket);
         } catch (SQLException e) {
             e.printStackTrace();
-}
+        }
 
-        return  ticket;
+        return ticket;
     }
 
 
