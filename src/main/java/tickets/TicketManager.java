@@ -41,7 +41,18 @@ public class TicketManager {
     public void deleteTicket(Guild guild, String channelID) {
 
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
-        channel.delete();
+        channel.delete().queue(
+            success -> {
+                try {
+                    Database.deleteTicketByChannelId(channelID);
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            },
+            error -> {
+                error.printStackTrace();
+            }
+        );
     }
 
 
