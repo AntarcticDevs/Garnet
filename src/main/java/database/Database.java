@@ -193,4 +193,36 @@ public class Database {
         }
     }
 
+
+    public static TicketData getTicketByChannelId(String ticketChannelId) throws SQLException {
+        TicketData ticket = new TicketData();
+        String sql = """
+                SELECT *
+                FROM tickets
+                WHERE channel_id = ?
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, ticketChannelId);
+                ResultSet resultSet = statement.executeQuery();
+
+                if (resultSet.next()) {
+                    ticket.channelId = resultSet.getString("channel_id");
+                    ticket.id = resultSet.getInt("id");
+                    ticket.creatorId = resultSet.getString("creator_id");
+                    ticket.state = resultSet.getString("state");
+                    ticket.claimerId = resultSet.getString("claimer_id");
+                    ticket.claimState = resultSet.getString("claim_state");
+
+
+                    return ticket;
+                }
+
+                return null;
+        
+                
+            }
+    }
+
 }
