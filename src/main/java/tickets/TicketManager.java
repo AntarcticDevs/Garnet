@@ -45,8 +45,9 @@ public class TicketManager {
     }
 
 
-    public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed, TicketData ticket) {
+    public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+        TicketData ticket;
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
@@ -76,8 +77,9 @@ public class TicketManager {
     }
 
 
-    public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed, TicketData ticket) {
+    public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+        TicketData ticket;
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
@@ -147,9 +149,10 @@ public class TicketManager {
     }
 
 
-    public String unclaimTicket(Guild guild, String channelID, EmbedBuilder embed, TicketData ticket) {
+    public String unclaimTicket(Guild guild, String channelID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
 
+        TicketData ticket;
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
@@ -183,9 +186,10 @@ public class TicketManager {
         return "SUCCESS";
     }
 
-    public String transferTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed, TicketData ticket) {
+    public String transferTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
 
+        TicketData ticket;
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
