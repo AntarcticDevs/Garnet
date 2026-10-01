@@ -47,6 +47,16 @@ public class TicketManager {
 
     public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed, TicketData ticket) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+        try {
+            ticket = Database.getTicketByChannelId(channelID);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return;
+        }
+        if (ticket == null) {
+            return;
+        }
+
         String previousName = channel.getName();
         channel.getManager().setName("closed-" + previousName).queue();
         Member creator = guild.getMemberById(creatorID);
@@ -68,6 +78,16 @@ public class TicketManager {
 
     public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed, TicketData ticket) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+        try {
+            ticket = Database.getTicketByChannelId(channelID);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return;
+        }
+        if (ticket == null) {
+            return;
+        }
+
         String currentName = channel.getName();
         if (currentName.startsWith("closed-")) {
             channel.getManager().setName(currentName.substring("closed-".length())).queue();
@@ -87,8 +107,21 @@ public class TicketManager {
     }
 
 
-    public String claimTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed, TicketData ticket) {
+    public String claimTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+
+        TicketData ticket;
+
+        try {
+            ticket = Database.getTicketByChannelId(channelID);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "DATABASE_ERROR";
+        }
+
+        if (ticket == null) {
+            return "TICKET_NOT_FOUND";
+        }
 
         if ("CLOSED".equals(ticket.state)) {
             return "TICKET_CLOSED";
@@ -105,6 +138,7 @@ public class TicketManager {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
             e.printStackTrace();
+            return "DATABASE_ERROR";
         }
 
         channel.sendMessageEmbeds(embed.build()).queue();
@@ -115,6 +149,16 @@ public class TicketManager {
 
     public String unclaimTicket(Guild guild, String channelID, EmbedBuilder embed, TicketData ticket) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+
+        try {
+            ticket = Database.getTicketByChannelId(channelID);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "DATABASE_ERROR";
+        }
+        if (ticket == null) {
+            return "TICKET_NOT_FOUND";
+        }
 
         if ("CLOSED".equals(ticket.state)) {
             return "TICKET_CLOSED";
@@ -131,6 +175,7 @@ public class TicketManager {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
             e.printStackTrace();
+            return "DATABASE_ERROR";
         }
 
         channel.sendMessageEmbeds(embed.build()).queue();
@@ -140,6 +185,16 @@ public class TicketManager {
 
     public String transferTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed, TicketData ticket) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
+
+        try {
+            ticket = Database.getTicketByChannelId(channelID);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "DATABASE_ERROR";
+        }
+        if (ticket == null) {
+            return "TICKET_NOT_FOUND";
+        }
 
         if ("CLOSED".equals(ticket.state)) {
             return "TICKET_CLOSED";
@@ -159,6 +214,7 @@ public class TicketManager {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
             e.printStackTrace();
+            return "DATABASE_ERROR";
         }
 
         channel.sendMessageEmbeds(embed.build()).queue();
