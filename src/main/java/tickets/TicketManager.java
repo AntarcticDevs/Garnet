@@ -37,6 +37,15 @@ public class TicketManager {
             }
         }
 
+        channel.upsertPermissionOverride(member).grant(
+                Permission.VIEW_CHANNEL,
+                Permission.MESSAGE_SEND,
+                Permission.MESSAGE_ATTACH_FILES,
+                Permission.MESSAGE_EMBED_LINKS,
+                Permission.MESSAGE_ADD_REACTION,
+                Permission.MESSAGE_HISTORY
+        ).complete();
+
         ticket.channelId = channel.getId();
         ticket.creatorId = member.getId();
         ticket.state = "OPEN";
