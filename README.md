@@ -1,29 +1,29 @@
-# Garnet
+# Garnet 💎
 
-**Garnet** is a Java-based Discord bot built with JDA, focused on server management, utilities, and configurable features.
+**Garnet** is a Java-based Discord bot focused on giving communities practical tools for server management, configuration, utilities, and support — while keeping the experience clean, modern, and easy to use.
 
-> **Garnet is currently under active development.**
+> 🚧 **Garnet is currently under active development.**
 
-## Features
+## ✨ Features
 
-- Discord bot functionality powered by JDA
-- Customisable embeds
-- Configurable rules
-- Welcome messages
-- SQLite database persistence
-- Ticket system *(in development)*
-- Server-management and utility commands
+- 🤖 Discord bot functionality powered by JDA
+- 📋 Customisable embeds
+- 📜 Configurable server rules
+- 👋 Welcome messages
+- 🗄️ SQLite database persistence
+- 🎫 Ticket system
+- 🛠️ Server-management and utility commands
 
-## Technology Stack
+## 🧰 Technology Stack
 
 - **Java 25**
-- **JDA 6.6.0**
+- **JDA 6.7.0**
 - **Maven**
 - **SQLite**
 
-## Ticket System
+## 🎫 Ticket System
 
-The ticket system is currently being developed from the ground up.
+Garnet's ticket system is being developed from the ground up with a focus on reliable data management and maintainable code.
 
 ### Progress
 
@@ -41,14 +41,25 @@ The ticket system is currently being developed from the ground up.
 - [ ] Transcripts
 - [ ] Ticket configuration
 
-## Project Structure
+## 📁 Project Structure
 
 Garnet is organised into separate packages for commands, events, database functionality, and ticket management.
 
-The project is being developed incrementally with a focus on keeping the code clean, maintainable, and easy to understand.
+The project is developed incrementally, with an emphasis on keeping the code clean, maintainable, and easy to understand.
 
-## Status
+## 🔐 Policies
+
+- [Privacy Policy](https://github.com/EnderKnight7op/Ender-Labs/blob/main/PRIVACY.md)
+- [Terms of Service](https://github.com/EnderKnight7op/Ender-Labs/blob/main/TERMS.md)
+- [Security Policy](https://github.com/EnderKnight7op/Ender-Labs/blob/main/SECURITY.md)
+
+## 📌 Status
 
 Garnet is a personal development project and is **not currently intended for general public use**.
 
-More features and improvements will be added as development continues.
+Features, documentation, and policies may change as development continues.
+
+## 🔗 Links
+
+- [Discord Server](https://dsc.gg/enderlabs)
+- [Source Code](https://github.com/EnderKnight7op/Garnet)
