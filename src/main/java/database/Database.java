@@ -10,8 +10,6 @@ import java.sql.PreparedStatement;
 import tickets.TicketData;
 import tickets.TicketPanelData;
 
-import tickets.TicketPanelData;
-
 
 public class Database {
 
@@ -86,10 +84,11 @@ public class Database {
                         guild_id TEXT NOT NULL,
                         name TEXT NOT NULL,
                         content TEXT,
-                        total_categories INTEGER,
-                        total_staff_roles INTEGER,
-                        total_ping_roles INTEGER,
-                        ticket_category_id TEXT
+                        total_categories INTEGER NOT NULL DEFAULT 0,
+                        total_staff_roles INTEGER NOT NULL DEFAULT 0,
+                        total_ping_roles INTEGER NOT NULL DEFAULT 0,
+                        ticket_category_id TEXT,
+                        UNIQUE (guild_id, name)
                     )
                     """);
 
@@ -326,23 +325,25 @@ public class Database {
     }
 
     
-    public static TicketPanelData getPanelData(String panelID) throws SQLException {
-        TicketPanelData panelData = new TicketPanelData();
-
+    public static TicketPanelData getPanelData(String guildId, String panelName) throws SQLException {
         String sql = """
                 SELECT *
                 FROM ticket_panels
-                WHERE id = ?
+                WHERE guild_id = ? AND name = ?
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+             PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            statement.setInt(1, Integer.parseInt(panelID));
+            statement.setString(1, guildId);
+            statement.setString(2, panelName);
 
-            ResultSet resultSet = statement.executeQuery();
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
 
-            if (resultSet.next()) {
+                TicketPanelData panelData = new TicketPanelData();
                 panelData.id = resultSet.getInt("id");
                 panelData.guildId = resultSet.getString("guild_id");
                 panelData.name = resultSet.getString("name");
@@ -351,9 +352,8 @@ public class Database {
                 panelData.totalStaffRoles = resultSet.getInt("total_staff_roles");
                 panelData.totalPingRoles = resultSet.getInt("total_ping_roles");
                 panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
+
+                return panelData;
             }
         }
-
-        return panelData;
-    }
-}
+    }}
