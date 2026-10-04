@@ -8,6 +8,7 @@ import java.sql.Statement;
 
 import java.sql.PreparedStatement;
 import tickets.TicketData;
+import tickets.TicketPanelData;
 
 public class Database {
 
@@ -75,12 +76,17 @@ public class Database {
                     )
                     """);
 
+                    ///////////////////////////////////// TICKET PANEL
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panels (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         guild_id TEXT NOT NULL,
                         name TEXT NOT NULL,
-                        content TEXT
+                        content TEXT,
+                        total_categories INTEGER,
+                        total_staff_roles INTEGER,
+                        total_ping_roles INTEGER,
+                        ticket_category_id TEXT
                     )
                     """);
 
@@ -316,4 +322,30 @@ public class Database {
         return null;
     }
 
+    
+    public static String getPanelData(String panelID) throws SQLException {
+        TicketPanelData panelData = new TicketPanelData();
+        String sql = """
+                SELECT *
+                FROM ticket_panels
+                WHERE id = ?
+
+            """;
+
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+                statement.setString(1, panelData.idString);
+                ResultSet resultSet = statement.executeQuery();
+
+                if (resultSet.next()) {
+                    panelData.content = "content";
+                    panelData.name = "name";
+                    panelData.guildId = "guild_id";
+                    panelData.ticketCategoryId = "ticket_category_id";
+                }
+        
+        return "e";
+       }
+    }
 }
