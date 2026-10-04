@@ -65,7 +65,32 @@ public class Ticket extends ListenerAdapter implements Command {
                 && "panel".equals(event.getSubcommandGroup())
                 && "edit".equals(event.getSubcommandName())
                 && "name".equals(event.getFocusedOption().getName())) {
-            event.replyChoices(List.of()).queue();
+            String guildId = event.getGuild() == null ? null : event.getGuild().getId();
+            if (guildId == null) {
+                event.replyChoices(List.of()).queue();
+                return;
+            }
+
+            String search = event.getFocusedOption().getValue();
+            String sql = "SELECT name FROM ticket_panels WHERE guild_id = ? AND name LIKE ? COLLATE NOCASE ORDER BY name LIMIT 25";
+
+            try (var connection = Database.getConnection();
+                 var statement = connection.prepareStatement(sql)) {
+                statement.setString(1, guildId);
+                statement.setString(2, search + "%");
+
+                try (var resultSet = statement.executeQuery()) {
+                    var choices = new java.util.ArrayList<net.dv8tion.jda.api.interactions.commands.Command.Choice>();
+                    while (resultSet.next()) {
+                        String name = resultSet.getString("name");
+                        choices.add(new net.dv8tion.jda.api.interactions.commands.Command.Choice(name, name));
+                    }
+                    event.replyChoices(choices).queue();
+                }
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.replyChoices(List.of()).queue();
+            }
         }
     }
 
@@ -130,15 +155,19 @@ public class Ticket extends ListenerAdapter implements Command {
                 return;
             }
 
-            TicketPanelData panelData = new TicketPanelData();
-            panelData.guildId = event.getGuild().getId();
-            panelData.name = panelNameOption.getAsString();
-            panelData.totalCategories = 0;
-            panelData.totalStaffRoles = 0;
-            panelData.totalPingRoles = 0;
-
             try {
-                panelData.ticketCategoryId = Database.getTicketCategory(panelData.guildId);
+                TicketPanelData panelData = Database.getPanelData(
+                        event.getGuild().getId(),
+                        panelNameOption.getAsString()
+                );
+
+                if (panelData == null) {
+                    event.reply("I couldn't find that ticket panel.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+
                 new TicketPanelEditor().open(event, panelData);
             } catch (SQLException exception) {
                 exception.printStackTrace();
