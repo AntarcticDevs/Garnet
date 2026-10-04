@@ -10,6 +10,9 @@ import java.sql.PreparedStatement;
 import tickets.TicketData;
 import tickets.TicketPanelData;
 
+import tickets.TicketPanelData;
+
+
 public class Database {
 
     private static final String URL = "jdbc:sqlite:garnet.db";
@@ -323,29 +326,34 @@ public class Database {
     }
 
     
-    public static String getPanelData(String panelID) throws SQLException {
+    public static TicketPanelData getPanelData(String panelID) throws SQLException {
         TicketPanelData panelData = new TicketPanelData();
+
         String sql = """
                 SELECT *
                 FROM ticket_panels
                 WHERE id = ?
-
-            """;
-
+                """;
 
         try (Connection connection = getConnection();
             PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, panelData.idString);
-                ResultSet resultSet = statement.executeQuery();
 
-                if (resultSet.next()) {
-                    panelData.content = "content";
-                    panelData.name = "name";
-                    panelData.guildId = "guild_id";
-                    panelData.ticketCategoryId = "ticket_category_id";
-                }
-        
-        return "e";
-       }
+            statement.setInt(1, Integer.parseInt(panelID));
+
+            ResultSet resultSet = statement.executeQuery();
+
+            if (resultSet.next()) {
+                panelData.id = resultSet.getInt("id");
+                panelData.guildId = resultSet.getString("guild_id");
+                panelData.name = resultSet.getString("name");
+                panelData.content = resultSet.getString("content");
+                panelData.totalCategories = resultSet.getInt("total_categories");
+                panelData.totalStaffRoles = resultSet.getInt("total_staff_roles");
+                panelData.totalPingRoles = resultSet.getInt("total_ping_roles");
+                panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
+            }
+        }
+
+        return panelData;
     }
 }

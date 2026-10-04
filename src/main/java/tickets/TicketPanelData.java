@@ -1,19 +1,21 @@
 package tickets;
 
-public class TicketPanelData {
-    public int id; // sql done I think...?
-    public String idString; // sql done
-    public String guildId; // sql done
-    public String name; // sql done
-    public String content; // sql done
-    public int totalCategories; // sql done
-    public int totalStaffRoles; // sql done
-    public int totalPingRoles; // sql done
-    public String ticketCategoryId; // sql done
+import java.util.ArrayList;
+import java.util.List;
 
-    // later:
-    // categories
-    // staffRoles
-    // pingRoles
-    // ticketEmbedConfig
+public class TicketPanelData {
+    public int id;
+    public String guildId;
+    public String name;
+    public String content;
+    public List<String> staffRoles = new ArrayList<>();
+    public List<String> pingRoles = new ArrayList<>();
+    public List<String> categorieList = new ArrayList<>();
+
+    public String ticketCategoryId;
+
+    // Later:
+    // List<String> categories;
+    // List<String> staffRoles;
+    // List<String> pingRoles;
 }
