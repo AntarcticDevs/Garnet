@@ -1,3 +1,4 @@
 target/
 garnet.db
 .vscode/
+.env

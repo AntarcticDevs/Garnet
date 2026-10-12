@@ -25,7 +25,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         TextDisplay subTitle = TextDisplay.of("## Editing: " + panelData.name);
         TextDisplay description = TextDisplay.of("**Configure how this ticket panel works.**");
 
-        TextDisplay categoryTotal = TextDisplay.of("**Categories: " + panelData.categorieList.size() + "**");
+        TextDisplay categoryTotal = TextDisplay.of("**Categories: " + panelData.categories.size() + "**");
         TextDisplay staffRolesTotal = TextDisplay.of("**Staff Roles: " + panelData.staffRoles.size() + "**");
         TextDisplay pingRolesTotal = TextDisplay.of("**Ping Roles: " + panelData.pingRoles.size() + "**");
         TextDisplay ticketCategory = TextDisplay.of(panelData.ticketCategoryId == null

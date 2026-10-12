@@ -17,6 +17,8 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
+import io.github.cdimascio.dotenv.Dotenv;
+
 import java.util.List;
 import java.util.ArrayList;
 
@@ -31,7 +33,9 @@ import java.sql.SQLException;
 public class Main {
 
         public static void main(String[] args) throws InterruptedException {
-        String token = System.getenv("DISCORD_TOKEN");
+        Dotenv dotenv = Dotenv.load();
+
+        String token = dotenv.get("DISCORD_TOKEN");
 
         if (token == null || token.isBlank()) {
             throw new IllegalStateException("DISCORD_TOKEN environment variable is not set");
