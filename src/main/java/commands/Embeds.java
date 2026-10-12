@@ -267,6 +267,13 @@ public class Embeds extends ListenerAdapter implements Command {
                 return;
             }
 
+            if (embed.isEmpty()) {
+                event.reply("This embed is empty. Edit it to add content before sending.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
             event.replyEmbeds(embed.build()).queue();
 
         } catch (SQLException exception) {
