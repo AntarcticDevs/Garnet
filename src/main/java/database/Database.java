@@ -390,6 +390,7 @@ public class Database {
                         statement.setString(1, panel.content);
                         statement.setString(2, panel.ticketCategoryId);
                         statement.setInt(3, panel.id);
+                        statement.executeUpdate();
                     } else {
                         statement.setString(1, panel.guildId);
                         statement.setString(2, panel.name);
