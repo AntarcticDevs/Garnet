@@ -6,14 +6,18 @@ import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import database.Database;
+
+import java.sql.SQLException;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
 import net.dv8tion.jda.api.components.separator.Separator;
 
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
-// import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+
 import net.dv8tion.jda.api.modals.Modal;
 
 
@@ -79,22 +83,79 @@ public class TicketPanelEditor extends ListenerAdapter {
         String action = parts[1];
         int panelId = Integer.parseInt(parts[2]);
 
-        if ("content".equals(action)) {
+        if (!"content".equals(action)) {
+            event.reply("This panel setting isn't implemented yet.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
 
-            TextInput content = TextInput.create("content", TextInputStyle.PARAGRAPH).setRequired(false).build();
+        if (event.getGuild() == null) {
+            event.reply("This editor can only be used inside a server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
 
-            Label contentLabel = Label.of(
-                "Panel Content", content
-            );
+        try {
+            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
+            if (panelData == null) {
+                event.reply("That ticket panel no longer exists.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
 
-            Modal modal = Modal.create(
-                    "panel_edit:content:" + panelId,
-                    "Edit Panel Content"
-            )
+            TextInput content = TextInput.create("content", TextInputStyle.PARAGRAPH)
+                    .setRequired(false)
+                    .setValue(panelData.content == null ? "" : panelData.content)
+                    .build();
+            Label contentLabel = Label.of("Panel Content", content);
+
+            Modal modal = Modal.create("panel_edit:content:" + panelId, "Edit Panel Content")
                     .addComponents(contentLabel)
                     .build();
-
             event.replyModal(modal).queue();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't load the panel content. Please try again.")
+                    .setEphemeral(true)
+                    .queue();
+        }
+    }
+
+    @Override
+    public void onModalInteraction(ModalInteractionEvent event) {
+        String customId = event.getModalId();
+        if (!customId.startsWith("panel_edit:content:")) {
+            return;
+        }
+
+        if (event.getGuild() == null) {
+            event.reply("This editor can only be used inside a server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        try {
+            int panelId = Integer.parseInt(customId.substring("panel_edit:content:".length()));
+            var contentInput = event.getValue("content");
+            String content = contentInput == null ? "" : contentInput.getAsString();
+
+            boolean updated = Database.updatePanelContent(event.getGuild().getId(), panelId, content);
+            event.reply(updated ? "Panel content saved." : "That ticket panel no longer exists.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (NumberFormatException exception) {
+            event.reply("Invalid ticket panel ID.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't save the panel content. Please try again.")
+                    .setEphemeral(true)
+                    .queue();
         }
     }
 }
