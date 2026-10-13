@@ -93,6 +93,9 @@ public class Database {
                     )
                     """);
 
+            // Migrate databases created before ticket_category_id was added.
+            addColumnIfMissing(connection, "ticket_panels", "ticket_category_id TEXT");
+
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panel_categories (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
