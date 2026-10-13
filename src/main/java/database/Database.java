@@ -325,6 +325,34 @@ public class Database {
     }
 
     
+    public static void savePanel(TicketPanelData panel) throws SQLException {
+        String sql = """
+                INSERT INTO ticket_panels (
+                    guild_id,
+                    name,
+                    content,
+                    ticket_category_id
+                )
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id, name) DO UPDATE SET
+                    content = excluded.content,
+                    ticket_category_id = excluded.ticket_category_id
+                """;
+
+        try (Connection connection = getConnection();
+            PreparedStatement statement = connection.prepareStatement(sql)) {
+
+            statement.setString(1, panel.guildId);
+            statement.setString(2, panel.name);
+            statement.setString(3, panel.content);
+            statement.setString(4, panel.ticketCategoryId);
+
+            statement.executeUpdate();
+        }
+    }
+
+
+    
     public static TicketPanelData getPanelData(String guildId, String panelName) throws SQLException {
         String sql = """
                 SELECT *
