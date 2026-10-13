@@ -106,10 +106,12 @@ public class TicketPanelEditor extends ListenerAdapter {
                 return;
             }
 
-            TextInput content = TextInput.create("content", TextInputStyle.PARAGRAPH)
-                    .setRequired(false)
-                    .setValue(panelData.content == null ? "" : panelData.content)
-                    .build();
+            TextInput.Builder contentBuilder = TextInput.create("content", TextInputStyle.PARAGRAPH)
+                    .setRequired(false);
+            if (panelData.content != null && !panelData.content.isBlank()) {
+                contentBuilder.setValue(panelData.content);
+            }
+            TextInput content = contentBuilder.build();
             Label contentLabel = Label.of("Panel Content", content);
 
             Modal modal = Modal.create("panel_edit:content:" + panelId, "Edit Panel Content")
