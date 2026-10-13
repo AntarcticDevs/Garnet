@@ -12,6 +12,19 @@ import utils.EmbedHelpers;
 
 
 public class TicketPanel {
+    public RestAction<Message> panel(TicketPanelData panelData, TextChannel channel) {
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle(panelData.name)
+                .setDescription(panelData.content == null || panelData.content.isBlank()
+                        ? "Use the button below to create a ticket."
+                        : panelData.content);
+
+        EmbedHelpers.setDefaultFooter(embed, channel.getGuild());
+        return channel.sendMessageEmbeds(embed.build())
+                .addComponents(ActionRow.of(Button.primary("ticket:support", "Create ticket")));
+    }
+
+
     public RestAction<Message> panel(EmbedBuilder embed, TextChannel channel, Button button) {
         if (embed == null) {
             embed = new EmbedBuilder();
