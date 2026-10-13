@@ -363,34 +363,59 @@ public class Database {
 
     
     public static void savePanel(TicketPanelData panel) throws SQLException {
-        String sql = """
-                INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(guild_id, name) DO UPDATE SET
-                    content = excluded.content,
-                    ticket_category_id = excluded.ticket_category_id
-                """;
-
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
             try {
-                try (PreparedStatement statement = connection.prepareStatement(sql)) {
-                    statement.setString(1, panel.guildId);
-                    statement.setString(2, panel.name);
-                    statement.setString(3, panel.content);
-                    statement.setString(4, panel.ticketCategoryId);
-                    statement.executeUpdate();
+                // Use an explicit lookup/update-or-insert so older databases without the
+                // (guild_id, name) unique constraint can still save panels safely.
+                boolean panelExists = false;
+                try (PreparedStatement lookup = connection.prepareStatement(
+                        "SELECT id FROM ticket_panels WHERE guild_id = ? AND name = ? ORDER BY id LIMIT 1")) {
+                    lookup.setString(1, panel.guildId);
+                    lookup.setString(2, panel.name);
+                    try (ResultSet resultSet = lookup.executeQuery()) {
+                        if (resultSet.next()) {
+                            panel.id = resultSet.getInt("id");
+                            panelExists = true;
+                        }
+                    }
                 }
 
-                try (PreparedStatement statement = connection.prepareStatement(
-                        "SELECT id FROM ticket_panels WHERE guild_id = ? AND name = ?")) {
-                    statement.setString(1, panel.guildId);
-                    statement.setString(2, panel.name);
-                    try (ResultSet resultSet = statement.executeQuery()) {
-                        if (!resultSet.next()) {
-                            throw new SQLException("Saved ticket panel could not be reloaded.");
+                String sql = panelExists
+                        ? "UPDATE ticket_panels SET content = ?, ticket_category_id = ? WHERE id = ?"
+                        : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id) VALUES (?, ?, ?, ?)";
+
+                try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    if (panelExists) {
+                        statement.setString(1, panel.content);
+                        statement.setString(2, panel.ticketCategoryId);
+                        statement.setInt(3, panel.id);
+                    } else {
+                        statement.setString(1, panel.guildId);
+                        statement.setString(2, panel.name);
+                        statement.setString(3, panel.content);
+                        statement.setString(4, panel.ticketCategoryId);
+                        statement.executeUpdate();
+
+                        try (ResultSet keys = statement.getGeneratedKeys()) {
+                            if (keys.next()) {
+                                panel.id = keys.getInt(1);
+                            }
                         }
-                        panel.id = resultSet.getInt("id");
+                    }
+                }
+
+                if (panel.id <= 0) {
+                    try (PreparedStatement lookup = connection.prepareStatement(
+                            "SELECT id FROM ticket_panels WHERE guild_id = ? AND name = ? ORDER BY id LIMIT 1")) {
+                        lookup.setString(1, panel.guildId);
+                        lookup.setString(2, panel.name);
+                        try (ResultSet resultSet = lookup.executeQuery()) {
+                            if (!resultSet.next()) {
+                                throw new SQLException("Saved ticket panel could not be reloaded.");
+                            }
+                            panel.id = resultSet.getInt("id");
+                        }
                     }
                 }
 
