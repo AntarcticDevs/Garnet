@@ -43,6 +43,18 @@ public class Ticket extends ListenerAdapter implements Command {
                 "The ticket panel to edit",
                 true
         ).setAutoComplete(true);
+        OptionData createPanelName = new OptionData(
+                OptionType.STRING,
+                "name",
+                "A name for the new ticket panel",
+                true
+        );
+        OptionData sendPanelName = new OptionData(
+                OptionType.STRING,
+                "name",
+                "The saved panel to send (leave empty for the default panel)",
+                false
+        ).setAutoComplete(true);
         return Commands.slash("ticket", "Manage the ticket system")
             .addSubcommands(
                 new SubcommandData("set-category", "Set the category for new tickets")
@@ -51,8 +63,10 @@ public class Ticket extends ListenerAdapter implements Command {
             .addSubcommandGroups(
                 new SubcommandGroupData("panel", "Manage the ticket panel")
                     .addSubcommands(
-                        new SubcommandData("send", "Send the ticket panel")
-                            .addOptions(channel),
+                        new SubcommandData("create", "Create a saved ticket panel")
+                            .addOptions(createPanelName),
+                        new SubcommandData("send", "Send a saved ticket panel")
+                            .addOptions(channel, sendPanelName),
                         new SubcommandData("edit", "Open the ticket panel editor")
                             .addOptions(panelName)
                     )
@@ -61,36 +75,37 @@ public class Ticket extends ListenerAdapter implements Command {
 
     @Override
     public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
-        if ("ticket".equals(event.getName())
+        boolean panelNameOption = "ticket".equals(event.getName())
                 && "panel".equals(event.getSubcommandGroup())
-                && "edit".equals(event.getSubcommandName())
-                && "name".equals(event.getFocusedOption().getName())) {
-            String guildId = event.getGuild() == null ? null : event.getGuild().getId();
-            if (guildId == null) {
-                event.replyChoices(List.of()).queue();
-                return;
-            }
+                && ("edit".equals(event.getSubcommandName()) || "send".equals(event.getSubcommandName()))
+                && "name".equals(event.getFocusedOption().getName());
+        if (!panelNameOption) {
+            return;
+        }
 
-            String search = event.getFocusedOption().getValue();
-            String sql = "SELECT name FROM ticket_panels WHERE guild_id = ? AND name LIKE ? COLLATE NOCASE ORDER BY name LIMIT 25";
+        String guildId = event.getGuild() == null ? null : event.getGuild().getId();
+        if (guildId == null) {
+            event.replyChoices(List.of()).queue();
+            return;
+        }
 
-            try (var connection = Database.getConnection();
-                 var statement = connection.prepareStatement(sql)) {
-                statement.setString(1, guildId);
-                statement.setString(2, search + "%");
-
-                try (var resultSet = statement.executeQuery()) {
-                    var choices = new java.util.ArrayList<net.dv8tion.jda.api.interactions.commands.Command.Choice>();
-                    while (resultSet.next()) {
-                        String name = resultSet.getString("name");
-                        choices.add(new net.dv8tion.jda.api.interactions.commands.Command.Choice(name, name));
-                    }
-                    event.replyChoices(choices).queue();
+        String search = event.getFocusedOption().getValue();
+        String sql = "SELECT name FROM ticket_panels WHERE guild_id = ? AND name LIKE ? COLLATE NOCASE ORDER BY name LIMIT 25";
+        try (var connection = Database.getConnection();
+             var statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guildId);
+            statement.setString(2, search + "%");
+            try (var resultSet = statement.executeQuery()) {
+                var choices = new java.util.ArrayList<net.dv8tion.jda.api.interactions.commands.Command.Choice>();
+                while (resultSet.next()) {
+                    String name = resultSet.getString("name");
+                    choices.add(new net.dv8tion.jda.api.interactions.commands.Command.Choice(name, name));
                 }
-            } catch (SQLException exception) {
-                exception.printStackTrace();
-                event.replyChoices(List.of()).queue();
+                event.replyChoices(choices).queue();
             }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.replyChoices(List.of()).queue();
         }
     }
 
@@ -115,33 +130,90 @@ public class Ticket extends ListenerAdapter implements Command {
         }
 
         if ("panel".equals(event.getSubcommandGroup())
-                && "send".equals(event.getSubcommandName())) {
-            OptionMapping channelOption = event.getOption("channel");
-            TextChannel channel;
-            if (channelOption != null) {
-                if (!(channelOption.getAsChannel() instanceof TextChannel selectedChannel)) {
-                    event.reply("Please choose a text channel for the ticket panel.")
+                && "create".equals(event.getSubcommandName())) {
+            OptionMapping nameOption = event.getOption("name");
+            if (nameOption == null || nameOption.getAsString().isBlank()) {
+                event.reply("Please provide a name for the ticket panel.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            String name = nameOption.getAsString().trim();
+            try {
+                if (Database.getPanelData(event.getGuild().getId(), name) != null) {
+                    event.reply("A ticket panel with that name already exists.")
                             .setEphemeral(true)
                             .queue();
                     return;
                 }
-                channel = selectedChannel;
-            } else if (event.getChannel() instanceof TextChannel currentChannel) {
-                channel = currentChannel;
-            } else {
+
+                TicketPanelData panelData = new TicketPanelData();
+                panelData.guildId = event.getGuild().getId();
+                panelData.name = name;
+                panelData.content = "Use the button below to create a ticket.";
+                Database.savePanel(panelData);
+                event.reply("Created ticket panel **" + panelData.name + "**. You can now edit or send it.")
+                        .setEphemeral(true)
+                        .queue();
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.reply("Couldn't create that ticket panel. Please try again.")
+                        .setEphemeral(true)
+                        .queue();
+            }
+            return;
+        }
+
+        if ("panel".equals(event.getSubcommandGroup())
+                && "send".equals(event.getSubcommandName())) {
+            OptionMapping channelOption = event.getOption("channel");
+            if (channelOption == null || !(channelOption.getAsChannel() instanceof TextChannel channel)) {
                 event.reply("Please choose a text channel for the ticket panel.")
                         .setEphemeral(true)
                         .queue();
                 return;
             }
 
-            event.deferReply(true).queue(hook ->
-                    new TicketPanel().panel(null, channel, null).queue(
-                            message -> hook.sendMessage("Ticket panel sent to " + channel.getAsMention() + ".").queue(),
-                            error -> hook.sendMessage("Couldn't send the ticket panel. Check that I can view and send messages in that channel.")
-                                    .queue()
-                    )
-            );
+            OptionMapping panelOption = event.getOption("name");
+            TicketPanel sender = new TicketPanel();
+
+            if (panelOption == null) {
+                event.deferReply(true).queue(hook ->
+                        sender.panel(null, channel, null).queue(
+                                message -> hook.sendMessage("Default ticket panel sent to " + channel.getAsMention() + ".").queue(),
+                                error -> hook.sendMessage("Couldn't send the ticket panel. Check that I can view and send messages in that channel.")
+                                        .queue()
+                        )
+                );
+                return;
+            }
+
+            try {
+                TicketPanelData panelData = Database.getPanelData(
+                        event.getGuild().getId(),
+                        panelOption.getAsString()
+                );
+                if (panelData == null) {
+                    event.reply("I couldn't find that saved ticket panel.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+
+                event.deferReply(true).queue(hook ->
+                        sender.panel(panelData, channel).queue(
+                                message -> hook.sendMessage("Ticket panel **" + panelData.name + "** sent to " + channel.getAsMention() + ".").queue(),
+                                error -> hook.sendMessage("Couldn't send the ticket panel. Check that I can view and send messages in that channel.")
+                                        .queue()
+                        )
+                );
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.reply("Couldn't load that ticket panel. Please try again.")
+                        .setEphemeral(true)
+                        .queue();
+            }
             return;
         }
 
