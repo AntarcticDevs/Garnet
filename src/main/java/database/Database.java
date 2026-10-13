@@ -5,6 +5,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 import java.sql.PreparedStatement;
 import tickets.TicketData;
@@ -89,6 +90,39 @@ public class Database {
                         total_ping_roles INTEGER NOT NULL DEFAULT 0,
                         ticket_category_id TEXT,
                         UNIQUE (guild_id, name)
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ticket_panel_categories (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        panel_id INTEGER NOT NULL,
+                        category_name TEXT NOT NULL,
+                        position INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE (panel_id, category_name),
+                        FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ticket_panel_staff_roles (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        panel_id INTEGER NOT NULL,
+                        role_id TEXT NOT NULL,
+                        position INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE (panel_id, role_id),
+                        FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ticket_panel_ping_roles (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        panel_id INTEGER NOT NULL,
+                        role_id TEXT NOT NULL,
+                        position INTEGER NOT NULL DEFAULT 0,
+                        UNIQUE (panel_id, role_id),
+                        FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
                     )
                     """);
 
@@ -327,61 +361,175 @@ public class Database {
     
     public static void savePanel(TicketPanelData panel) throws SQLException {
         String sql = """
-                INSERT INTO ticket_panels (
-                    guild_id,
-                    name,
-                    content,
-                    ticket_category_id
-                )
+                INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(guild_id, name) DO UPDATE SET
                     content = excluded.content,
                     ticket_category_id = excluded.ticket_category_id
                 """;
 
-        try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (Connection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                    statement.setString(1, panel.guildId);
+                    statement.setString(2, panel.name);
+                    statement.setString(3, panel.content);
+                    statement.setString(4, panel.ticketCategoryId);
+                    statement.executeUpdate();
+                }
 
-            statement.setString(1, panel.guildId);
-            statement.setString(2, panel.name);
-            statement.setString(3, panel.content);
-            statement.setString(4, panel.ticketCategoryId);
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "SELECT id FROM ticket_panels WHERE guild_id = ? AND name = ?")) {
+                    statement.setString(1, panel.guildId);
+                    statement.setString(2, panel.name);
+                    try (ResultSet resultSet = statement.executeQuery()) {
+                        if (!resultSet.next()) {
+                            throw new SQLException("Saved ticket panel could not be reloaded.");
+                        }
+                        panel.id = resultSet.getInt("id");
+                    }
+                }
 
-            statement.executeUpdate();
+                replacePanelValues(connection, panel.id, "ticket_panel_categories", "category_name", panel.categories);
+                replacePanelValues(connection, panel.id, "ticket_panel_staff_roles", "role_id", panel.staffRoles);
+                replacePanelValues(connection, panel.id, "ticket_panel_ping_roles", "role_id", panel.pingRoles);
+
+                panel.totalCategories = panel.categories.size();
+                panel.totalStaffRoles = panel.staffRoles.size();
+                panel.totalPingRoles = panel.pingRoles.size();
+
+                try (PreparedStatement statement = connection.prepareStatement("""
+                        UPDATE ticket_panels
+                        SET total_categories = ?, total_staff_roles = ?, total_ping_roles = ?
+                        WHERE id = ?
+                        """)) {
+                    statement.setInt(1, panel.totalCategories);
+                    statement.setInt(2, panel.totalStaffRoles);
+                    statement.setInt(3, panel.totalPingRoles);
+                    statement.setInt(4, panel.id);
+                    statement.executeUpdate();
+                }
+
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
         }
     }
 
 
-    
-    public static TicketPanelData getPanelData(String guildId, String panelName) throws SQLException {
-        String sql = """
-                SELECT *
-                FROM ticket_panels
-                WHERE guild_id = ? AND name = ?
-                """;
+    private static void replacePanelValues(
+            Connection connection,
+            int panelId,
+            String tableName,
+            String valueColumn,
+            List<String> values
+    ) throws SQLException {
+        // Table and column names are internal constants selected by callers.
+        try (PreparedStatement delete = connection.prepareStatement(
+                "DELETE FROM " + tableName + " WHERE panel_id = ?")) {
+            delete.setInt(1, panelId);
+            delete.executeUpdate();
+        }
 
-        try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
 
-            statement.setString(1, guildId);
-            statement.setString(2, panelName);
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-                if (!resultSet.next()) {
-                    return null;
+        String sql = "INSERT INTO " + tableName + " (panel_id, " + valueColumn + ", position) VALUES (?, ?, ?)";
+        try (PreparedStatement insert = connection.prepareStatement(sql)) {
+            int position = 0;
+            for (String value : values) {
+                if (value == null || value.isBlank()) {
+                    continue;
                 }
+                insert.setInt(1, panelId);
+                insert.setString(2, value);
+                insert.setInt(3, position++);
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
 
-                TicketPanelData panelData = new TicketPanelData();
-                panelData.id = resultSet.getInt("id");
-                panelData.guildId = resultSet.getString("guild_id");
-                panelData.name = resultSet.getString("name");
-                panelData.content = resultSet.getString("content");
-                panelData.totalCategories = resultSet.getInt("total_categories");
-                panelData.totalStaffRoles = resultSet.getInt("total_staff_roles");
-                panelData.totalPingRoles = resultSet.getInt("total_ping_roles");
-                panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
 
-                return panelData;
+    private static List<String> loadPanelValues(
+            Connection connection,
+            int panelId,
+            String tableName,
+            String valueColumn
+    ) throws SQLException {
+        List<String> values = new java.util.ArrayList<>();
+        String sql = "SELECT " + valueColumn + " FROM " + tableName
+                + " WHERE panel_id = ? ORDER BY position, id";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, panelId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    values.add(resultSet.getString(valueColumn));
+                }
             }
         }
-    }}
+        return values;
+    }
+
+
+    private static TicketPanelData readPanelData(Connection connection, ResultSet resultSet) throws SQLException {
+        TicketPanelData panelData = new TicketPanelData();
+        panelData.id = resultSet.getInt("id");
+        panelData.guildId = resultSet.getString("guild_id");
+        panelData.name = resultSet.getString("name");
+        panelData.content = resultSet.getString("content");
+        panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
+
+        panelData.categories = loadPanelValues(connection, panelData.id, "ticket_panel_categories", "category_name");
+        panelData.staffRoles = loadPanelValues(connection, panelData.id, "ticket_panel_staff_roles", "role_id");
+        panelData.pingRoles = loadPanelValues(connection, panelData.id, "ticket_panel_ping_roles", "role_id");
+
+        // Derive counts from the loaded lists so duplicate state cannot drift.
+        panelData.totalCategories = panelData.categories.size();
+        panelData.totalStaffRoles = panelData.staffRoles.size();
+        panelData.totalPingRoles = panelData.pingRoles.size();
+        return panelData;
+    }
+
+
+    public static TicketPanelData getPanelData(String guildId, String panelName) throws SQLException {
+        String sql = "SELECT * FROM ticket_panels WHERE guild_id = ? AND name = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guildId);
+            statement.setString(2, panelName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? readPanelData(connection, resultSet) : null;
+            }
+        }
+    }
+
+
+    public static TicketPanelData getPanelDataById(String guildId, int panelId) throws SQLException {
+        String sql = "SELECT * FROM ticket_panels WHERE guild_id = ? AND id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guildId);
+            statement.setInt(2, panelId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? readPanelData(connection, resultSet) : null;
+            }
+        }
+    }
+
+
+    public static boolean updatePanelContent(String guildId, int panelId, String content) throws SQLException {
+        String sql = "UPDATE ticket_panels SET content = ? WHERE guild_id = ? AND id = ?";
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, content);
+            statement.setString(2, guildId);
+            statement.setInt(3, panelId);
+            return statement.executeUpdate() == 1;
+        }
+    }
+}
