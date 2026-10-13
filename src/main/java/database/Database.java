@@ -93,7 +93,10 @@ public class Database {
                     )
                     """);
 
-            // Migrate databases created before ticket_category_id was added.
+            // Migrate databases created before newer ticket panel columns were added.
+            addColumnIfMissing(connection, "ticket_panels", "total_categories INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(connection, "ticket_panels", "total_staff_roles INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(connection, "ticket_panels", "total_ping_roles INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "ticket_category_id TEXT");
 
             statement.execute("""
