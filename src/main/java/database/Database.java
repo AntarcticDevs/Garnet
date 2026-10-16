@@ -74,9 +74,11 @@ public class Database {
                         creator_id TEXT,
                         state TEXT,
                         claimer_id TEXT,
-                        claim_state TEXT
+                        claim_state TEXT,
+                        category_name TEXT
                     )
                     """);
+            addColumnIfMissing(connection, "tickets", "category_name TEXT");
 
                     ///////////////////////////////////// TICKET PANEL
             statement.execute("""
@@ -207,9 +209,10 @@ public class Database {
                     creator_id,
                     state,
                     claimer_id,
-                    claim_state
+                    claim_state,
+                    category_name
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """;
 
         try (Connection connection = getConnection();
@@ -220,6 +223,7 @@ public class Database {
             statement.setString(3, ticket.state);
             statement.setString(4, ticket.claimerId);
             statement.setString(5, ticket.claimState);
+            statement.setString(6, ticket.categoryName);
 
             statement.executeUpdate();
 
@@ -241,7 +245,8 @@ public class Database {
                     creator_id = ?,
                     state = ?,
                     claimer_id = ?,
-                    claim_state = ?
+                    claim_state = ?,
+                    category_name = ?
                 WHERE id = ?
                 """;
 
@@ -253,7 +258,8 @@ public class Database {
             statement.setString(3, ticket.state);
             statement.setString(4, ticket.claimerId);
             statement.setString(5, ticket.claimState);
-            statement.setInt(6, ticket.id);
+            statement.setString(6, ticket.categoryName);
+            statement.setInt(7, ticket.id);
 
             statement.executeUpdate();
         }
@@ -280,6 +286,7 @@ public class Database {
                     ticket.state = resultSet.getString("state");
                     ticket.claimerId = resultSet.getString("claimer_id");
                     ticket.claimState = resultSet.getString("claim_state");
+                    ticket.categoryName = resultSet.getString("category_name");
 
 
                     return ticket;

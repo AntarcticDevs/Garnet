@@ -8,5 +8,6 @@ public class TicketData {
     public String state;
     public String claimerId;
     public String claimState;
+    public String categoryName;
 
 }

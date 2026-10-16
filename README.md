@@ -36,10 +36,12 @@ Garnet's ticket system is being developed from the ground up with a focus on rel
 - [x] Transfer tickets
 - [x] SQLite persistence
 - [x] Delete ticket data
-- [ ] Ticket commands
-- [ ] Ticket panel
-- [ ] Transcripts
-- [ ] Ticket configuration
+- [x] Ticket commands for closing, reopening, claiming, unclaiming, transferring, deleting, and transcribing tickets
+- [x] Configurable ticket panels with category selection
+- [x] Text transcripts (latest 1,000 messages)
+- [x] Server and panel ticket configuration, including channel categories and staff/ping roles
+
+Use `/ticket panel create`, `/ticket panel edit`, and `/ticket panel send` to publish a panel. Configure the default ticket channel category with `/ticket set-category`. Ticket creators can close and reopen their ticket; members with **Manage Channels** can also claim, transfer, delete, or create a transcript.
 
 ## 📁 Project Structure
 

@@ -6,12 +6,15 @@ import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
+import net.dv8tion.jda.api.components.buttons.Button;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.requests.restaction.ChannelAction;
 
 import java.sql.SQLException;
 import java.util.EnumSet;
+import java.util.List;
 
 import database.Database;
 
@@ -19,14 +22,35 @@ import database.Database;
 
 public class TicketManager {
 
-    public TicketData createTicket(Guild guild, Member member, String categoryID) {
+    public TicketData createTicket(Guild guild, Member member, String categoryID) throws SQLException {
+        return createTicket(guild, member, categoryID, null, List.of(), List.of());
+    }
+
+    public TicketData createTicket(
+            Guild guild,
+            Member member,
+            String categoryID,
+            String categoryName,
+            List<String> staffRoleIds,
+            List<String> pingRoleIds
+    ) throws SQLException {
         TicketData ticket = new TicketData();
 
         Category category = categoryID == null ? null : guild.getCategoryById(categoryID);
+        if (categoryID != null && category == null) {
+            throw new IllegalArgumentException("Configured ticket category does not exist in this server.");
+        }
 
-        String channelName = category == null
-                ? "ticket-" + member.getUser().getName()
-                : member.getUser().getName() + " ticket";
+        String ownerName = member.getUser().getName().toLowerCase().replaceAll("[^a-z0-9-]", "-");
+        String topicName = categoryName == null || categoryName.isBlank()
+                ? ""
+                : "-" + categoryName.toLowerCase().replaceAll("[^a-z0-9-]", "-");
+        String channelName = "ticket-" + ownerName + topicName;
+        channelName = channelName.replaceAll("-{2,}", "-");
+        channelName = channelName.replaceAll("(^-|-$)", "");
+        if (channelName.length() > 90) {
+            channelName = channelName.substring(0, 90);
+        }
         ChannelAction<TextChannel> channelAction = category == null
                 ? guild.createTextChannel(channelName)
                 : guild.createTextChannel(channelName, category);
@@ -48,6 +72,20 @@ public class TicketManager {
                 ),
                 null
         );
+        EnumSet<Permission> staffPermissions = EnumSet.of(
+                Permission.VIEW_CHANNEL,
+                Permission.MESSAGE_SEND,
+                Permission.MESSAGE_ATTACH_FILES,
+                Permission.MESSAGE_EMBED_LINKS,
+                Permission.MESSAGE_HISTORY
+        );
+        for (String roleId : java.util.stream.Stream.concat(
+                staffRoleIds.stream(), pingRoleIds.stream()).distinct().toList()) {
+            var role = guild.getRoleById(roleId);
+            if (role != null && !guild.getPublicRole().getId().equals(roleId)) {
+                channelAction.addPermissionOverride(role, staffPermissions, null);
+            }
+        }
 
         TextChannel channel = channelAction.complete();
 
@@ -55,11 +93,16 @@ public class TicketManager {
         ticket.creatorId = member.getId();
         ticket.state = "OPEN";
         ticket.claimState = "UNCLAIMED";
+        ticket.categoryName = categoryName;
 
         try {
             Database.saveTicket(ticket);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (SQLException exception) {
+            channel.delete().queue(
+                    ignored -> { },
+                    exception::addSuppressed
+            );
+            throw exception;
         }
 
         return ticket;
@@ -84,16 +127,16 @@ public class TicketManager {
     }
 
 
-    public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) {
+    public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) throws SQLException {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
-        TicketData ticket;
-        try {
-            ticket = Database.getTicketByChannelId(channelID);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (channel == null) {
             return;
         }
+        TicketData ticket = Database.getTicketByChannelId(channelID);
         if (ticket == null) {
+            return;
+        }
+        if ("CLOSED".equals(ticket.state)) {
             return;
         }
 
@@ -102,30 +145,29 @@ public class TicketManager {
         Member creator = guild.getMemberById(creatorID);
         
         ticket.state = "CLOSED";
+        Database.updateTicket(ticket);
 
-        try {
-            Database.updateTicket(ticket);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (creator != null) {
+            channel.upsertPermissionOverride(creator).deny(Permission.MESSAGE_SEND).queue();
         }
 
-        channel.upsertPermissionOverride(creator).deny(Permission.MESSAGE_SEND).queue();
-
-        channel.sendMessageEmbeds(embed.build()).queue();
+        channel.sendMessageEmbeds(embed.build())
+                .addComponents(ActionRow.of(Button.success("ticket:reopen", "Reopen ticket")))
+                .queue();
 
     }
 
 
-    public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) {
+    public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) throws SQLException {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
-        TicketData ticket;
-        try {
-            ticket = Database.getTicketByChannelId(channelID);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (channel == null) {
             return;
         }
+        TicketData ticket = Database.getTicketByChannelId(channelID);
         if (ticket == null) {
+            return;
+        }
+        if (!"CLOSED".equals(ticket.state)) {
             return;
         }
 
@@ -136,15 +178,14 @@ public class TicketManager {
         Member creator = guild.getMemberById(creatorID);
 
         ticket.state = "OPEN";
+        Database.updateTicket(ticket);
 
-        try {
-            Database.updateTicket(ticket);
-        } catch (SQLException e) {
-            e.printStackTrace();
+        if (creator != null) {
+            channel.upsertPermissionOverride(creator).grant(Permission.MESSAGE_SEND).queue();
         }
-
-        channel.upsertPermissionOverride(creator).grant(Permission.MESSAGE_SEND).queue();
-        channel.sendMessageEmbeds(embed.build()).queue();
+        channel.sendMessageEmbeds(embed.build())
+                .addComponents(ActionRow.of(Button.danger("ticket:close", "Close ticket")))
+                .queue();
     }
 
 

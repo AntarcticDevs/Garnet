@@ -1,6 +1,7 @@
 package commands;
 
 import database.Database;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -15,9 +16,13 @@ import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
+import net.dv8tion.jda.api.utils.FileUpload;
 import tickets.TicketPanel;
 import tickets.TicketPanelData;
 import tickets.TicketPanelEditor;
+import tickets.TicketData;
+import tickets.TicketManager;
+import tickets.TranscriptManager;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -55,10 +60,24 @@ public class Ticket extends ListenerAdapter implements Command {
                 "The saved panel to send (leave empty for the default panel)",
                 false
         ).setAutoComplete(true);
+        OptionData transferMember = new OptionData(
+                OptionType.USER,
+                "member",
+                "The staff member to transfer this ticket to",
+                true
+        );
         return Commands.slash("ticket", "Manage the ticket system")
             .addSubcommands(
                 new SubcommandData("set-category", "Set the category for new tickets")
-                    .addOptions(category)
+                    .addOptions(category),
+                new SubcommandData("close", "Close the ticket in this channel"),
+                new SubcommandData("reopen", "Reopen the ticket in this channel"),
+                new SubcommandData("claim", "Claim the ticket in this channel"),
+                new SubcommandData("unclaim", "Release your claim on this ticket"),
+                new SubcommandData("transfer", "Transfer this ticket to another staff member")
+                    .addOptions(transferMember),
+                new SubcommandData("delete", "Delete this ticket channel and its data"),
+                new SubcommandData("transcript", "Post a text transcript of this ticket")
             )
             .addSubcommandGroups(
                 new SubcommandGroupData("panel", "Manage the ticket panel")
@@ -122,7 +141,10 @@ public class Ticket extends ListenerAdapter implements Command {
             return;
         }
 
-        if (event.getMember() == null || !event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+        boolean panelCommand = "panel".equals(event.getSubcommandGroup());
+        boolean configurationCommand = "set-category".equals(event.getSubcommandName());
+        if ((panelCommand || configurationCommand)
+                && (event.getMember() == null || !event.getMember().hasPermission(Permission.MANAGE_SERVER))) {
             event.reply("You don't have permission to use this command.")
                     .setEphemeral(true)
                     .queue();
@@ -270,6 +292,193 @@ public class Ticket extends ListenerAdapter implements Command {
                         .setEphemeral(true)
                         .queue();
             }
+            return;
         }
+
+        handleTicketAction(event);
+    }
+
+    private void handleTicketAction(SlashCommandInteractionEvent event) {
+        if (!(event.getChannel() instanceof TextChannel channel) || event.getMember() == null) {
+            event.reply("Ticket actions can only be used in a server ticket channel.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        TicketData ticket;
+        try {
+            ticket = Database.getTicketByChannelId(channel.getId());
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't load this ticket. Please try again.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+        if (ticket == null) {
+            event.reply("This channel isn't an active ticket.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        boolean staff = event.getMember().hasPermission(Permission.MANAGE_CHANNEL);
+        boolean creator = ticket.creatorId.equals(event.getMember().getId());
+        String action = event.getSubcommandName();
+        TicketManager manager = new TicketManager();
+
+        switch (action) {
+            case "close" -> {
+                if (!creator && !staff) {
+                    replyDenied(event, "Only the ticket creator or a channel manager can close this ticket.");
+                    return;
+                }
+                if ("CLOSED".equals(ticket.state)) {
+                    event.reply("This ticket is already closed.").setEphemeral(true).queue();
+                    return;
+                }
+                try {
+                    manager.closeTicket(event.getGuild(), channel.getId(), ticket.creatorId,
+                            new EmbedBuilder().setTitle("Ticket closed")
+                                    .setDescription("Closed by " + event.getUser().getAsMention() + "."));
+                    event.reply("Ticket closed.").setEphemeral(true).queue();
+                } catch (SQLException exception) {
+                    exception.printStackTrace();
+                    replyDatabaseError(event);
+                }
+            }
+            case "reopen" -> {
+                if (!creator && !staff) {
+                    replyDenied(event, "Only the ticket creator or a channel manager can reopen this ticket.");
+                    return;
+                }
+                if (!"CLOSED".equals(ticket.state)) {
+                    event.reply("This ticket is already open.").setEphemeral(true).queue();
+                    return;
+                }
+                try {
+                    manager.reopenTicket(event.getGuild(), channel.getId(), ticket.creatorId,
+                            new EmbedBuilder().setTitle("Ticket reopened")
+                                    .setDescription("Reopened by " + event.getUser().getAsMention() + "."));
+                    event.reply("Ticket reopened.").setEphemeral(true).queue();
+                } catch (SQLException exception) {
+                    exception.printStackTrace();
+                    replyDatabaseError(event);
+                }
+            }
+            case "claim" -> {
+                if (!staff) {
+                    replyDenied(event, "Only a server staff member with Manage Channels can claim tickets.");
+                    return;
+                }
+                String result = manager.claimTicket(event.getGuild(), channel.getId(), event.getMember().getId(),
+                        new EmbedBuilder().setTitle("Ticket claimed")
+                                .setDescription("Claimed by " + event.getUser().getAsMention() + "."));
+                replyTicketResult(event, result, "Ticket claimed.");
+            }
+            case "unclaim" -> {
+                if (!staff) {
+                    replyDenied(event, "Only a server staff member with Manage Channels can unclaim tickets.");
+                    return;
+                }
+                if (ticket.claimerId != null && !ticket.claimerId.equals(event.getMember().getId()) && !staff) {
+                    replyDenied(event, "Only the current claimer or a channel manager can unclaim this ticket.");
+                    return;
+                }
+                String result = manager.unclaimTicket(event.getGuild(), channel.getId(),
+                        new EmbedBuilder().setTitle("Ticket unclaimed")
+                                .setDescription("Released by " + event.getUser().getAsMention() + "."));
+                replyTicketResult(event, result, "Ticket unclaimed.");
+            }
+            case "transfer" -> {
+                if (!staff) {
+                    replyDenied(event, "Only a server staff member with Manage Channels can transfer tickets.");
+                    return;
+                }
+                OptionMapping memberOption = event.getOption("member");
+                if (memberOption == null || memberOption.getAsMember() == null) {
+                    event.reply("Choose a member of this server to receive the ticket.")
+                            .setEphemeral(true).queue();
+                    return;
+                }
+                var assignee = memberOption.getAsMember();
+                if (!assignee.hasPermission(Permission.MANAGE_CHANNEL)) {
+                    event.reply("The selected member must have the Manage Channels permission to receive this ticket.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+                String result = manager.transferTicket(event.getGuild(), channel.getId(), assignee.getId(),
+                        new EmbedBuilder().setTitle("Ticket transferred")
+                                .setDescription("Transferred to " + assignee.getAsMention() + " by "
+                                        + event.getUser().getAsMention() + "."));
+                replyTicketResult(event, result, "Ticket transferred to " + assignee.getAsMention() + ".");
+            }
+            case "delete" -> {
+                if (!staff) {
+                    replyDenied(event, "Only a server staff member with Manage Channels can delete tickets.");
+                    return;
+                }
+                event.deferReply(true).queue(hook -> channel.delete().queue(
+                        ignored -> {
+                            try {
+                                Database.deleteTicketByChannelId(channel.getId());
+                                hook.editOriginal("Ticket deleted.").queue();
+                            } catch (SQLException exception) {
+                                exception.printStackTrace();
+                                hook.editOriginal("The channel was deleted, but the ticket record couldn't be removed.")
+                                        .queue();
+                            }
+                        },
+                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
+                                .queue()
+                ));
+            }
+            case "transcript" -> {
+                if (!creator && !staff) {
+                    replyDenied(event, "Only the ticket creator or a channel manager can create a transcript.");
+                    return;
+                }
+                event.deferReply(true).queue(hook -> {
+                    try {
+                        byte[] transcript = new TranscriptManager().createTranscript(channel);
+                        hook.sendFiles(FileUpload.fromData(transcript, channel.getName() + "-transcript.txt"))
+                                .queue(
+                                        ignored -> { },
+                                        error -> hook.editOriginal("Couldn't upload the transcript. Check my permissions.")
+                                                .queue()
+                                );
+                    } catch (RuntimeException exception) {
+                        exception.printStackTrace();
+                        hook.editOriginal("Couldn't create the transcript. Please try again.").queue();
+                    }
+                });
+            }
+            default -> event.reply("Unknown ticket action.").setEphemeral(true).queue();
+        }
+    }
+
+    private void replyTicketResult(SlashCommandInteractionEvent event, String result, String successMessage) {
+        String message = switch (result) {
+            case "SUCCESS" -> successMessage;
+            case "TICKET_NOT_FOUND" -> "This channel isn't an active ticket.";
+            case "TICKET_CLOSED" -> "This ticket is closed.";
+            case "ALREADY_CLAIMED" -> "This ticket has already been claimed.";
+            case "NOT_CLAIMED" -> "This ticket isn't currently claimed.";
+            case "SAME_CLAIMER" -> "This ticket is already assigned to that member.";
+            default -> "Couldn't update this ticket. Please try again.";
+        };
+        event.reply(message).setEphemeral(true).queue();
+    }
+
+    private void replyDenied(SlashCommandInteractionEvent event, String message) {
+        event.reply(message).setEphemeral(true).queue();
+    }
+
+    private void replyDatabaseError(SlashCommandInteractionEvent event) {
+        event.reply("Couldn't save this ticket update. Please try again.")
+                .setEphemeral(true)
+                .queue();
     }
 }
