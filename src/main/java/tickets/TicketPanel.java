@@ -24,15 +24,19 @@ public class TicketPanel {
         EmbedHelpers.setDefaultFooter(embed, channel.getGuild());
         String customId = panelData.id > 0 ? "ticket:create:" + panelData.id : "ticket:support";
         if (!panelData.categories.isEmpty()) {
-            StringSelectMenu.Builder categories = StringSelectMenu.create("ticket:category:" + panelData.id)
-                    .setPlaceholder("Choose a ticket category");
-            panelData.categories.stream().limit(25).forEach(category ->
-                    categories.addOptions(SelectOption.of(category, category)));
             return channel.sendMessageEmbeds(embed.build())
-                    .addComponents(ActionRow.of(categories.build()));
+                    .addComponents(ActionRow.of(categoryMenu(panelData)));
         }
         return channel.sendMessageEmbeds(embed.build())
                 .addComponents(ActionRow.of(Button.primary(customId, "Create ticket")));
+    }
+
+    static StringSelectMenu categoryMenu(TicketPanelData panelData) {
+        StringSelectMenu.Builder categories = StringSelectMenu.create("ticket:category:" + panelData.id)
+                .setPlaceholder("Choose a ticket category");
+        panelData.categories.stream().limit(25).forEach(category ->
+                categories.addOptions(SelectOption.of(category, category)));
+        return categories.build();
     }
 
 

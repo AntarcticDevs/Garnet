@@ -13,6 +13,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.exceptions.InsufficientPermissionException;
 import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
@@ -84,6 +85,7 @@ public class TicketButton extends ListenerAdapter {
                 return;
             }
             String categoryName = event.getValues().get(0);
+            event.getMessage().editMessageComponents(ActionRow.of(TicketPanel.categoryMenu(panelData))).queue();
             List<String> questions = Database.getPanelQuestions(panelId, categoryName);
             if (questions.isEmpty()) {
                 event.deferReply(true).queue(hook ->
@@ -191,7 +193,16 @@ public class TicketButton extends ListenerAdapter {
                                     "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."
                             )
                     );
-        } catch (SQLException | RuntimeException exception) {
+        } catch (IllegalArgumentException exception) {
+            exception.printStackTrace();
+            completion.accept(exception.getMessage());
+        } catch (InsufficientPermissionException exception) {
+            exception.printStackTrace();
+            completion.accept("I don't have permission to create ticket channels. Please ask a moderator to grant me Manage Channels and Manage Roles.");
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            completion.accept("Couldn't save your ticket. Please try again or contact a server moderator.");
+        } catch (RuntimeException exception) {
             exception.printStackTrace();
             completion.accept("Couldn't create your ticket. Please try again or contact a server moderator.");
         }
