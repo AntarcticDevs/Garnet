@@ -135,6 +135,18 @@ public class Database {
                     """);
 
             statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ticket_panel_questions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        panel_id INTEGER NOT NULL,
+                        category_name TEXT NOT NULL,
+                        position INTEGER NOT NULL,
+                        prompt TEXT NOT NULL,
+                        UNIQUE (panel_id, category_name, position),
+                        FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
                     CREATE TABLE IF NOT EXISTS guild_rules (
                         guild_id TEXT PRIMARY KEY,
                         embed_id INTEGER NOT NULL,
@@ -433,6 +445,13 @@ public class Database {
                 replacePanelValues(connection, panel.id, "ticket_panel_categories", "category_name", panel.categories);
                 replacePanelValues(connection, panel.id, "ticket_panel_staff_roles", "role_id", panel.staffRoles);
                 replacePanelValues(connection, panel.id, "ticket_panel_ping_roles", "role_id", panel.pingRoles);
+                try (PreparedStatement cleanup = connection.prepareStatement(
+                        "DELETE FROM ticket_panel_questions WHERE panel_id = ? AND category_name NOT IN "
+                                + "(SELECT category_name FROM ticket_panel_categories WHERE panel_id = ?)")) {
+                    cleanup.setInt(1, panel.id);
+                    cleanup.setInt(2, panel.id);
+                    cleanup.executeUpdate();
+                }
 
                 panel.totalCategories = panel.categories.size();
                 panel.totalStaffRoles = panel.staffRoles.size();
@@ -571,4 +590,55 @@ public class Database {
             return statement.executeUpdate() == 1;
         }
     }
+
+    public static List<String> getPanelQuestions(int panelId, String categoryName) throws SQLException {
+        List<String> questions = new java.util.ArrayList<>();
+        try (Connection connection = getConnection();
+             PreparedStatement statement = connection.prepareStatement("""
+                     SELECT prompt
+                     FROM ticket_panel_questions
+                     WHERE panel_id = ? AND category_name = ?
+                     ORDER BY position
+                     """)) {
+            statement.setInt(1, panelId);
+            statement.setString(2, categoryName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    questions.add(resultSet.getString("prompt"));
+                }
+            }
+        }
+        return questions;
+    }
+
+    public static void savePanelQuestions(int panelId, String categoryName, List<String> questions) throws SQLException {
+        try (Connection connection = getConnection()) {
+            connection.setAutoCommit(false);
+            try {
+                try (PreparedStatement delete = connection.prepareStatement(
+                        "DELETE FROM ticket_panel_questions WHERE panel_id = ? AND category_name = ?")) {
+                    delete.setInt(1, panelId);
+                    delete.setString(2, categoryName);
+                    delete.executeUpdate();
+                }
+                try (PreparedStatement insert = connection.prepareStatement("""
+                        INSERT INTO ticket_panel_questions (panel_id, category_name, position, prompt)
+                        VALUES (?, ?, ?, ?)
+                        """)) {
+                    for (int i = 0; i < questions.size(); i++) {
+                        insert.setInt(1, panelId);
+                        insert.setString(2, categoryName);
+                        insert.setInt(3, i);
+                        insert.setString(4, questions.get(i));
+                        insert.addBatch();
+                    }
+                    insert.executeBatch();
+                }
+                connection.commit();
+            } catch (SQLException exception) {
+                connection.rollback();
+                throw exception;
+            }
+        }
 }
+    }

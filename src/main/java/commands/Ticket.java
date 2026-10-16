@@ -87,6 +87,10 @@ public class Ticket extends ListenerAdapter implements Command {
                         new SubcommandData("send", "Send a saved ticket panel")
                             .addOptions(channel, sendPanelName),
                         new SubcommandData("edit", "Open the ticket panel editor")
+                            .addOptions(panelName),
+                        new SubcommandData("staff-roles", "Select staff roles for a ticket panel")
+                            .addOptions(panelName),
+                        new SubcommandData("ping-roles", "Select ping roles for a ticket panel")
                             .addOptions(panelName)
                     )
             );
@@ -96,7 +100,10 @@ public class Ticket extends ListenerAdapter implements Command {
     public void onCommandAutoCompleteInteraction(CommandAutoCompleteInteractionEvent event) {
         boolean panelNameOption = "ticket".equals(event.getName())
                 && "panel".equals(event.getSubcommandGroup())
-                && ("edit".equals(event.getSubcommandName()) || "send".equals(event.getSubcommandName()))
+                && ("edit".equals(event.getSubcommandName())
+                    || "send".equals(event.getSubcommandName())
+                    || "staff-roles".equals(event.getSubcommandName())
+                    || "ping-roles".equals(event.getSubcommandName()))
                 && "name".equals(event.getFocusedOption().getName());
         if (!panelNameOption) {
             return;
@@ -263,6 +270,41 @@ public class Ticket extends ListenerAdapter implements Command {
                 }
 
                 new TicketPanelEditor().open(event, panelData);
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.reply("Couldn't load the ticket panel settings. Please try again.")
+                        .setEphemeral(true)
+                        .queue();
+            }
+            return;
+        }
+
+        if ("panel".equals(event.getSubcommandGroup())
+                && ("staff-roles".equals(event.getSubcommandName())
+                    || "ping-roles".equals(event.getSubcommandName()))) {
+            OptionMapping rolePanelName = event.getOption("name");
+            if (rolePanelName == null) {
+                event.reply("Please choose a ticket panel.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+            try {
+                TicketPanelData panelData = Database.getPanelData(
+                        event.getGuild().getId(),
+                        rolePanelName.getAsString()
+                );
+                if (panelData == null) {
+                    event.reply("I couldn't find that ticket panel.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+                new TicketPanelEditor().openRoleSelector(
+                        event,
+                        panelData,
+                        "staff-roles".equals(event.getSubcommandName())
+                );
             } catch (SQLException exception) {
                 exception.printStackTrace();
                 event.reply("Couldn't load the ticket panel settings. Please try again.")

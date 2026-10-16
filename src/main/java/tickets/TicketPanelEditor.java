@@ -4,11 +4,14 @@ import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import database.Database;
+import net.dv8tion.jda.api.entities.Role;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -30,6 +33,34 @@ import net.dv8tion.jda.api.modals.Modal;
 
 public class TicketPanelEditor extends ListenerAdapter {
 
+    public void openRoleSelector(
+            SlashCommandInteractionEvent event,
+            TicketPanelData panelData,
+            boolean staffRoles
+    ) {
+        List<String> selectedRoleIds = staffRoles ? panelData.staffRoles : panelData.pingRoles;
+        List<EntitySelectMenu.DefaultValue> defaults = selectedRoleIds.stream()
+                .map(event.getGuild()::getRoleById)
+                .filter(java.util.Objects::nonNull)
+                .map(EntitySelectMenu.DefaultValue::from)
+                .toList();
+        String roleType = staffRoles ? "staff" : "ping";
+        EntitySelectMenu.Builder selector = EntitySelectMenu.create(
+                        "panel_roles:" + roleType + ":" + panelData.id,
+                        EntitySelectMenu.SelectTarget.ROLE
+                )
+                .setPlaceholder(staffRoles ? "Select staff roles" : "Select ping roles")
+                .setRequiredRange(0, 25);
+        if (!defaults.isEmpty()) {
+            selector.setDefaultValues(defaults);
+        }
+        event.reply("Choose up to 25 roles. Your selection replaces the panel's current "
+                        + (staffRoles ? "staff-role" : "ping-role") + " list.")
+                .addComponents(ActionRow.of(selector.build()))
+                .setEphemeral(true)
+                .queue();
+    }
+
     public void open(SlashCommandInteractionEvent event, TicketPanelData panelData) {
         TextDisplay title = TextDisplay.of("# TicketPanelEditor");
         TextDisplay subTitle = TextDisplay.of("## Editing: " + panelData.name);
@@ -47,6 +78,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         Button button3 = Button.primary("panel_edit:staff_roles:" + panelData.id, "Staff Roles");
         Button button4 = Button.primary("panel_edit:ping_roles:" + panelData.id, "Ping Roles");
         Button button5 = Button.primary("panel_edit:ticket_category:" + panelData.id, "Ticket Category");
+        Button button6 = Button.primary("panel_edit:category_questions:" + panelData.id, "Category Questions");
         Container container = Container.of(
             title,
             subTitle,
@@ -59,7 +91,7 @@ public class TicketPanelEditor extends ListenerAdapter {
             Separator.createDivider(Separator.Spacing.LARGE),
             TextDisplay.of("## Edit:"),
             ActionRow.of(button1, button2, button3),
-            ActionRow.of(button4, button5),
+            ActionRow.of(button4, button5, button6),
             Separator.createDivider(Separator.Spacing.LARGE),
             TextDisplay.of("-# © 2026 Garnet • All rights reserved.")
         );
@@ -94,7 +126,8 @@ public class TicketPanelEditor extends ListenerAdapter {
                     .queue();
             return;
         }
-        if (!Set.of("content", "categories", "staff_roles", "ping_roles", "ticket_category").contains(action)) {
+        if (!Set.of("content", "categories", "staff_roles", "ping_roles", "ticket_category",
+                "category_questions").contains(action)) {
             event.reply("That ticket panel setting isn't available.")
                     .setEphemeral(true)
                     .queue();
@@ -114,6 +147,23 @@ public class TicketPanelEditor extends ListenerAdapter {
                 event.reply("That ticket panel no longer exists.")
                         .setEphemeral(true)
                         .queue();
+                return;
+            }
+
+            if ("category_questions".equals(action)) {
+                TextInput categoryInput = TextInput.create("category", TextInputStyle.SHORT)
+                        .setRequired(true)
+                        .setPlaceholder("Exact category name from the Categories setting")
+                        .build();
+                TextInput questionsInput = TextInput.create("questions", TextInputStyle.PARAGRAPH)
+                        .setRequired(false)
+                        .setPlaceholder("One prompt per line (up to 5; leave blank to remove)")
+                        .build();
+                Modal modal = Modal.create("panel_edit:category_questions:" + panelId, "Category Questions")
+                        .addComponents(Label.of("Ticket Category", categoryInput),
+                                Label.of("Questions", questionsInput))
+                        .build();
+                event.replyModal(modal).queue();
                 return;
             }
 
@@ -156,6 +206,66 @@ public class TicketPanelEditor extends ListenerAdapter {
     }
 
     @Override
+    public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
+        String[] parts = event.getComponentId().split(":");
+        if (parts.length != 3 || !"panel_roles".equals(parts[0])
+                || !Set.of("staff", "ping").contains(parts[1])) {
+            return;
+        }
+        if (event.getGuild() == null || event.getMember() == null
+                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_SERVER)) {
+            event.reply("You don't have permission to edit ticket panels.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        try {
+            int panelId = Integer.parseInt(parts[2]);
+            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
+            if (panelData == null) {
+                event.reply("That ticket panel no longer exists.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+            List<String> roleIds = event.getValues().stream()
+                    .filter(Role.class::isInstance)
+                    .map(Role.class::cast)
+                    .filter(role -> !role.isPublicRole())
+                    .map(Role::getId)
+                    .distinct()
+                    .toList();
+            if (roleIds.size() > 25) {
+                event.reply("Select no more than 25 roles.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+            if ("staff".equals(parts[1])) {
+                panelData.staffRoles = new ArrayList<>(roleIds);
+            } else {
+                panelData.pingRoles = new ArrayList<>(roleIds);
+            }
+            Database.savePanel(panelData);
+            event.reply("Saved " + roleIds.size() + " "
+                            + ("staff".equals(parts[1]) ? "staff" : "ping")
+                            + " role(s) for **" + panelData.name + "**.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (NumberFormatException exception) {
+            event.reply("Invalid ticket panel ID.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't save the selected roles. Please try again.")
+                    .setEphemeral(true)
+                    .queue();
+        }
+    }
+
+    @Override
     public void onModalInteraction(ModalInteractionEvent event) {
         String customId = event.getModalId();
         if (!customId.startsWith("panel_edit:")) {
@@ -182,6 +292,27 @@ public class TicketPanelEditor extends ListenerAdapter {
             TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
             if (panelData == null) {
                 event.reply("That ticket panel no longer exists.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            if ("category_questions".equals(parts[1])) {
+                String categoryName = event.getValue("category").getAsString().trim();
+                if (!panelData.categories.contains(categoryName)) {
+                    event.reply("Add that exact category to the panel before configuring its questions.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+                String promptText = event.getValue("questions") == null
+                        ? ""
+                        : event.getValue("questions").getAsString();
+                List<String> questions = parseQuestions(promptText);
+                Database.savePanelQuestions(panelId, categoryName, questions);
+                event.reply(questions.isEmpty()
+                                ? "Questions removed for **" + categoryName + "**."
+                                : "Saved " + questions.size() + " question(s) for **" + categoryName + "**.")
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -240,6 +371,23 @@ public class TicketPanelEditor extends ListenerAdapter {
             throw new IllegalArgumentException("A ticket panel can have at most 25 categories.");
         }
         return new ArrayList<>(categories);
+    }
+
+    private List<String> parseQuestions(String value) {
+        if (value.isBlank()) {
+            return new ArrayList<>();
+        }
+        List<String> questions = value.lines()
+                .map(String::trim)
+                .filter(question -> !question.isEmpty())
+                .toList();
+        if (questions.size() > 5) {
+            throw new IllegalArgumentException("A category can have at most five questions.");
+        }
+        if (questions.stream().anyMatch(question -> question.length() > 45)) {
+            throw new IllegalArgumentException("Each question must be 45 characters or fewer.");
+        }
+        return questions;
     }
 
     private List<String> parseRoles(String value, net.dv8tion.jda.api.entities.Guild guild) {

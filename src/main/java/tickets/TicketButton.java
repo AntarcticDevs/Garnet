@@ -12,7 +12,17 @@ import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
-
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.modals.Modal;
+import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.utils.FileUpload;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class TicketButton extends ListenerAdapter {
@@ -31,6 +41,10 @@ public class TicketButton extends ListenerAdapter {
         }
         if ("ticket:reopen".equals(customId)) {
             reopenTicket(event);
+            return;
+        }
+        if (customId.startsWith("ticket:staff:")) {
+            handleStaffButton(event, customId.substring("ticket:staff:".length()));
             return;
         }
         if ("ticket:support".equals(customId)) {
@@ -69,7 +83,27 @@ public class TicketButton extends ListenerAdapter {
                         .queue();
                 return;
             }
-            createTicket(event, panelData, event.getValues().get(0));
+            String categoryName = event.getValues().get(0);
+            List<String> questions = Database.getPanelQuestions(panelId, categoryName);
+            if (questions.isEmpty()) {
+                event.deferReply(true).queue(hook ->
+                        createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
+                                List.of(),
+                                message -> hook.editOriginal(message).queue()));
+                return;
+            }
+            List<Label> fields = new ArrayList<>();
+            for (int index = 0; index < questions.size(); index++) {
+                TextInput answer = TextInput.create("answer" + index, TextInputStyle.PARAGRAPH)
+                        .setRequired(true)
+                        .build();
+                fields.add(Label.of(questions.get(index), answer));
+            }
+            Modal modal = Modal.create("ticket:form:" + panelId + ":" + panelData.categories.indexOf(categoryName),
+                            "New Ticket Request")
+                    .addComponents(fields)
+                    .build();
+            event.replyModal(modal).queue();
         } catch (NumberFormatException exception) {
             event.reply("This ticket panel is invalid. Please contact a server moderator.")
                     .setEphemeral(true)
@@ -83,96 +117,248 @@ public class TicketButton extends ListenerAdapter {
     }
 
     private void createTicket(ButtonInteractionEvent event, Integer panelId, String categoryName) {
-        event.deferReply(true).queue();
-        Member member = event.getMember();
-        if (member == null) {
-            event.getHook().editOriginal("Couldn't identify your server membership. Please try again.").queue();
-            return;
-        }
-
+        event.deferReply(true).queue(hook -> {
         try {
             TicketPanelData panelData = panelId == null
                     ? null
                     : Database.getPanelDataById(event.getGuild().getId(), panelId);
             if (panelId != null && panelData == null) {
-                event.getHook().editOriginal("That ticket panel no longer exists.").queue();
+                hook.editOriginal("That ticket panel no longer exists.").queue();
                 return;
             }
+            createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
+                    List.of(),
+                    message -> hook.editOriginal(message).queue());
+        } catch (SQLException | RuntimeException exception) {
+            exception.printStackTrace();
+            hook.editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.").queue();
+        }
+        });
+    }
+
+    private void createTicket(
+            net.dv8tion.jda.api.entities.Guild guild,
+            Member member,
+            TicketPanelData panelData,
+            String categoryName,
+            List<String> questions,
+            List<String> answers,
+            Consumer<String> completion
+    ) {
+        try {
             String categoryId = panelData != null && panelData.ticketCategoryId != null
                     ? panelData.ticketCategoryId
-                    : Database.getTicketCategory(event.getGuild().getId());
-            TicketManager manager = new TicketManager();
-            TicketData ticket = manager.createTicket(
-                    event.getGuild(),
+                    : Database.getTicketCategory(guild.getId());
+            List<String> staffRoles = panelData == null ? List.of() : panelData.staffRoles;
+            List<String> pingRoles = panelData == null ? List.of() : panelData.pingRoles;
+            TicketData ticket = new TicketManager().createTicket(
+                    guild,
                     member,
                     categoryId,
                     categoryName,
-                    panelData == null ? java.util.List.of() : panelData.staffRoles,
-                    panelData == null ? java.util.List.of() : panelData.pingRoles
+                    staffRoles,
+                    pingRoles
             );
-            TextChannel channel = event.getGuild().getTextChannelById(ticket.channelId);
-            String roleMentions = panelData == null ? "" : panelData.pingRoles.stream()
+            TextChannel channel = guild.getTextChannelById(ticket.channelId);
+            EmbedBuilder embed = new EmbedBuilder()
+                    .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
+                    .setDescription("Opened by " + member.getAsMention() + ". Please describe your request here.")
+                    .setFooter("Ticket ID: " + ticket.id);
+            for (int i = 0; i < Math.min(answers.size(), 5); i++) {
+                String answer = answers.get(i);
+                embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer, false);
+            }
+            String roleMentions = pingRoles.stream()
                     .map(roleId -> "<@&" + roleId + ">")
                     .reduce((left, right) -> left + " " + right)
                     .orElse("");
-            String message = (roleMentions.isBlank() ? "" : roleMentions + " ")
-                    + member.getAsMention() + ", your ticket is open.";
-            if (categoryName != null) {
-                message += " Category: **" + categoryName.replace("@", "@\u200B") + "**.";
-            }
-            channel.sendMessage(message)
+            channel.sendMessage((roleMentions.isBlank() ? "" : roleMentions + " ") + member.getAsMention())
+                    .setEmbeds(embed.build())
                     .setAllowedMentions(java.util.EnumSet.of(Message.MentionType.USER, Message.MentionType.ROLE))
-                    .addComponents(ActionRow.of(Button.danger("ticket:close", "Close ticket")))
+                    .addComponents(
+                            ActionRow.of(
+                                    Button.danger("ticket:close", "Close"),
+                                    Button.primary("ticket:staff:claim", "Claim"),
+                                    Button.secondary("ticket:staff:unclaim", "Unclaim"),
+                                    Button.secondary("ticket:staff:transcript", "Transcript"),
+                                    Button.secondary("ticket:staff:transfer", "Transfer")
+                            ),
+                            ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket"))
+                    )
                     .queue(
-                            ignored -> event.getHook().editOriginal("Ticket created: <#" + ticket.channelId + ">").queue(),
-                            error -> event.getHook().editOriginal(
-                                    "Ticket channel created, but I couldn't post its controls. Check my channel permissions."
-                            ).queue()
+                            ignored -> completion.accept("Ticket created: <#" + ticket.channelId + ">"),
+                            error -> completion.accept(
+                                    "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."
+                            )
                     );
         } catch (SQLException | RuntimeException exception) {
             exception.printStackTrace();
-            event.getHook().editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.")
-                    .queue();
+            completion.accept("Couldn't create your ticket. Please try again or contact a server moderator.");
         }
     }
 
-    private void createTicket(StringSelectInteractionEvent event, TicketPanelData panelData, String categoryName) {
-        event.deferReply(true).queue();
-        Member member = event.getMember();
-        try {
-            String categoryId = panelData.ticketCategoryId != null
-                    ? panelData.ticketCategoryId
-                    : Database.getTicketCategory(event.getGuild().getId());
-            TicketData ticket = new TicketManager().createTicket(
-                    event.getGuild(),
-                    member,
-                    categoryId,
-                    categoryName,
-                    panelData.staffRoles,
-                    panelData.pingRoles
-            );
-            TextChannel channel = event.getGuild().getTextChannelById(ticket.channelId);
-            String roleMentions = panelData.pingRoles.stream()
-                    .map(roleId -> "<@&" + roleId + ">")
-                    .reduce((left, right) -> left + " " + right)
-                    .orElse("");
-            String message = (roleMentions.isBlank() ? "" : roleMentions + " ")
-                    + member.getAsMention() + ", your ticket is open. Category: **"
-                    + categoryName.replace("@", "@\u200B") + "**.";
-            channel.sendMessage(message)
-                    .setAllowedMentions(java.util.EnumSet.of(Message.MentionType.USER, Message.MentionType.ROLE))
-                    .addComponents(ActionRow.of(Button.danger("ticket:close", "Close ticket")))
-                    .queue(
-                            ignored -> event.getHook().editOriginal("Ticket created: <#" + ticket.channelId + ">").queue(),
-                            error -> event.getHook().editOriginal(
-                                    "Ticket channel created, but I couldn't post its controls. Check my channel permissions."
-                            ).queue()
-                    );
-        } catch (SQLException | RuntimeException exception) {
-            exception.printStackTrace();
-            event.getHook().editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.")
-                    .queue();
+    @Override
+    public void onModalInteraction(ModalInteractionEvent event) {
+        if (event.getGuild() == null || event.getMember() == null) {
+            return;
         }
+        String[] parts = event.getModalId().split(":");
+        if (parts.length == 4 && "ticket".equals(parts[0]) && "form".equals(parts[1])) {
+            submitTicketForm(event, parts);
+        } else if ("ticket:transfer".equals(event.getModalId())) {
+            submitTransfer(event);
+        }
+    }
+
+    private void submitTicketForm(ModalInteractionEvent event, String[] parts) {
+        try {
+            int panelId = Integer.parseInt(parts[2]);
+            int categoryIndex = Integer.parseInt(parts[3]);
+            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
+            if (panelData == null || categoryIndex < 0 || categoryIndex >= panelData.categories.size()) {
+                event.reply("This ticket panel or category is no longer available.").setEphemeral(true).queue();
+                return;
+            }
+            String categoryName = panelData.categories.get(categoryIndex);
+            List<String> questions = Database.getPanelQuestions(panelId, categoryName);
+            List<String> answers = new ArrayList<>();
+            for (int index = 0; index < questions.size(); index++) {
+                var field = event.getValue("answer" + index);
+                if (field == null || field.getAsString().isBlank()) {
+                    event.reply("Please complete all ticket questions.").setEphemeral(true).queue();
+                    return;
+                }
+                answers.add(field.getAsString());
+            }
+            event.deferReply(true).queue(hook -> createTicket(
+                    event.getGuild(), event.getMember(), panelData, categoryName, questions, answers,
+                    message -> hook.editOriginal(message).queue()));
+        } catch (NumberFormatException | SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't load the ticket form settings. Please try again.").setEphemeral(true).queue();
+        }
+    }
+
+    private void handleStaffButton(ButtonInteractionEvent event, String action) {
+        if (!(event.getChannel() instanceof TextChannel channel) || event.getMember() == null) {
+            event.reply("This control can only be used inside a ticket channel.").setEphemeral(true).queue();
+            return;
+        }
+        if (!event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
+            event.reply("Only staff with Manage Channels can use this control.").setEphemeral(true).queue();
+            return;
+        }
+        try {
+            TicketData ticket = Database.getTicketByChannelId(channel.getId());
+            if (ticket == null) {
+                event.reply("This channel isn't an active ticket.").setEphemeral(true).queue();
+                return;
+            }
+            if ("transfer".equals(action)) {
+                TextInput target = TextInput.create("target", TextInputStyle.SHORT)
+                        .setRequired(true)
+                        .setPlaceholder("Mention or user ID")
+                        .build();
+                event.replyModal(Modal.create("ticket:transfer", "Transfer Ticket")
+                        .addComponents(Label.of("Staff member", target)).build()).queue();
+                return;
+            }
+            if ("delete".equals(action)) {
+                event.deferReply(true).queue(hook -> channel.delete().queue(
+                        ignored -> {
+                            try {
+                                Database.deleteTicketByChannelId(channel.getId());
+                                hook.editOriginal("Ticket deleted.").queue();
+                            } catch (SQLException exception) {
+                                exception.printStackTrace();
+                                hook.editOriginal("Channel deleted, but its ticket record could not be removed.").queue();
+                            }
+                        },
+                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.").queue()
+                ));
+                return;
+            }
+            if ("transcript".equals(action)) {
+                event.deferReply(true).queue(hook -> {
+                    try {
+                        byte[] transcript = new TranscriptManager().createTranscript(channel);
+                        hook.sendFiles(FileUpload.fromData(transcript, channel.getName() + "-transcript.txt"))
+                                .queue(null, error -> hook.editOriginal("Couldn't upload the transcript.").queue());
+                    } catch (RuntimeException exception) {
+                        exception.printStackTrace();
+                        hook.editOriginal("Couldn't create the transcript.").queue();
+                    }
+                });
+                return;
+            }
+            if ("claim".equals(action)) {
+                String result = new TicketManager().claimTicket(event.getGuild(), channel.getId(),
+                        event.getMember().getId(), new EmbedBuilder().setTitle("Ticket claimed")
+                                .setDescription("Claimed by " + event.getUser().getAsMention() + "."));
+                replyStaffResult(event, result, "Ticket claimed.");
+            } else if ("unclaim".equals(action)) {
+                String result = new TicketManager().unclaimTicket(event.getGuild(), channel.getId(),
+                        new EmbedBuilder().setTitle("Ticket unclaimed")
+                                .setDescription("Released by " + event.getUser().getAsMention() + "."));
+                replyStaffResult(event, result, "Ticket unclaimed.");
+            } else {
+                event.reply("Unknown ticket control.").setEphemeral(true).queue();
+            }
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't load the ticket record.").setEphemeral(true).queue();
+        }
+    }
+
+    private void submitTransfer(ModalInteractionEvent event) {
+        if (!(event.getChannel() instanceof TextChannel channel)
+                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
+            event.reply("Only ticket staff can transfer tickets.").setEphemeral(true).queue();
+            return;
+        }
+        String targetText = event.getValue("target").getAsString().trim();
+        Matcher matcher = Pattern.compile("^(?:<@!?)?(\\d{17,20})>?$").matcher(targetText);
+        if (!matcher.matches()) {
+            event.reply("Enter a valid member mention or ID.").setEphemeral(true).queue();
+            return;
+        }
+        Member target = event.getGuild().getMemberById(matcher.group(1));
+        if (target == null || !target.hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
+            event.reply("The selected member must be in this server and have Manage Channels.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        String result = new TicketManager().transferTicket(event.getGuild(), channel.getId(), target.getId(),
+                new EmbedBuilder().setTitle("Ticket transferred")
+                        .setDescription("Transferred to " + target.getAsMention() + " by "
+                                + event.getUser().getAsMention() + "."));
+        replyStaffResult(event, result, "Ticket transferred to " + target.getAsMention() + ".");
+    }
+
+    private void replyStaffResult(ModalInteractionEvent event, String result, String successMessage) {
+        String message = switch (result) {
+            case "SUCCESS" -> successMessage;
+            case "TICKET_NOT_FOUND" -> "This channel isn't an active ticket.";
+            case "TICKET_CLOSED" -> "This ticket is closed.";
+            case "ALREADY_CLAIMED" -> "This ticket has already been claimed.";
+            case "NOT_CLAIMED" -> "This ticket isn't currently claimed.";
+            case "SAME_CLAIMER" -> "This ticket is already assigned to that member.";
+            default -> "Couldn't update this ticket.";
+        };
+        event.reply(message).setEphemeral(true).queue();
+    }
+
+    private void replyStaffResult(ButtonInteractionEvent event, String result, String successMessage) {
+        String message = switch (result) {
+            case "SUCCESS" -> successMessage;
+            case "TICKET_NOT_FOUND" -> "This channel isn't an active ticket.";
+            case "TICKET_CLOSED" -> "This ticket is closed.";
+            case "ALREADY_CLAIMED" -> "This ticket has already been claimed.";
+            case "NOT_CLAIMED" -> "This ticket isn't currently claimed.";
+            case "SAME_CLAIMER" -> "This ticket is already assigned to that member.";
+            default -> "Couldn't update this ticket.";
+        };
+        event.reply(message).setEphemeral(true).queue();
     }
 
     private void closeTicket(ButtonInteractionEvent event) {
