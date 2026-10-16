@@ -15,6 +15,7 @@ import net.dv8tion.jda.api.requests.restaction.ChannelAction;
 import java.sql.SQLException;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.function.Consumer;
 
 import database.Database;
 
@@ -22,18 +23,16 @@ import database.Database;
 
 public class TicketManager {
 
-    public TicketData createTicket(Guild guild, Member member, String categoryID) throws SQLException {
-        return createTicket(guild, member, categoryID, null, List.of(), List.of());
-    }
-
-    public TicketData createTicket(
+    public void createTicket(
             Guild guild,
             Member member,
             String categoryID,
             String categoryName,
             List<String> staffRoleIds,
-            List<String> pingRoleIds
-    ) throws SQLException {
+            List<String> pingRoleIds,
+            Consumer<TicketData> onSuccess,
+            Consumer<Throwable> onFailure
+    ) {
         TicketData ticket = new TicketData();
 
         Category category = categoryID == null ? null : guild.getCategoryById(categoryID);
@@ -87,25 +86,25 @@ public class TicketManager {
             }
         }
 
-        TextChannel channel = channelAction.complete();
+        channelAction.queue(channel -> {
+            ticket.channelId = channel.getId();
+            ticket.creatorId = member.getId();
+            ticket.state = "OPEN";
+            ticket.claimState = "UNCLAIMED";
+            ticket.categoryName = categoryName;
 
-        ticket.channelId = channel.getId();
-        ticket.creatorId = member.getId();
-        ticket.state = "OPEN";
-        ticket.claimState = "UNCLAIMED";
-        ticket.categoryName = categoryName;
-
-        try {
-            Database.saveTicket(ticket);
-        } catch (SQLException exception) {
-            channel.delete().queue(
-                    ignored -> { },
-                    exception::addSuppressed
-            );
-            throw exception;
-        }
-
-        return ticket;
+            try {
+                Database.saveTicket(ticket);
+            } catch (SQLException | RuntimeException exception) {
+                channel.delete().queue(
+                        ignored -> { },
+                        exception::addSuppressed
+                );
+                onFailure.accept(exception);
+                return;
+            }
+            onSuccess.accept(ticket);
+        }, onFailure);
     }
 
 

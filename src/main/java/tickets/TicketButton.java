@@ -153,58 +153,82 @@ public class TicketButton extends ListenerAdapter {
                     : Database.getTicketCategory(guild.getId());
             List<String> staffRoles = panelData == null ? List.of() : panelData.staffRoles;
             List<String> pingRoles = panelData == null ? List.of() : panelData.pingRoles;
-            TicketData ticket = new TicketManager().createTicket(
+            new TicketManager().createTicket(
                     guild,
                     member,
                     categoryId,
                     categoryName,
                     staffRoles,
-                    pingRoles
+                    pingRoles,
+                    ticket -> {
+                        try {
+                            postTicketMessage(
+                                    guild, member, categoryName, questions, answers, pingRoles, ticket, completion);
+                        } catch (RuntimeException exception) {
+                            reportTicketCreationFailure(exception, completion);
+                        }
+                    },
+                    exception -> reportTicketCreationFailure(exception, completion)
             );
-            TextChannel channel = guild.getTextChannelById(ticket.channelId);
-            EmbedBuilder embed = new EmbedBuilder()
-                    .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
-                    .setDescription("Opened by " + member.getAsMention() + ". Please describe your request here.")
-                    .setFooter("Ticket ID: " + ticket.id);
-            for (int i = 0; i < Math.min(answers.size(), 5); i++) {
-                String answer = answers.get(i);
-                embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer, false);
-            }
-            String roleMentions = pingRoles.stream()
-                    .map(roleId -> "<@&" + roleId + ">")
-                    .reduce((left, right) -> left + " " + right)
-                    .orElse("");
-            channel.sendMessage((roleMentions.isBlank() ? "" : roleMentions + " ") + member.getAsMention())
-                    .setEmbeds(embed.build())
-                    .setAllowedMentions(java.util.EnumSet.of(Message.MentionType.USER, Message.MentionType.ROLE))
-                    .addComponents(
-                            ActionRow.of(
-                                    Button.danger("ticket:close", "Close"),
-                                    Button.primary("ticket:staff:claim", "Claim"),
-                                    Button.secondary("ticket:staff:unclaim", "Unclaim"),
-                                    Button.secondary("ticket:staff:transcript", "Transcript"),
-                                    Button.secondary("ticket:staff:transfer", "Transfer")
-                            ),
-                            ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket"))
-                    )
-                    .queue(
-                            ignored -> completion.accept("Ticket created: <#" + ticket.channelId + ">"),
-                            error -> completion.accept(
-                                    "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."
-                            )
-                    );
-        } catch (IllegalArgumentException exception) {
-            exception.printStackTrace();
+        } catch (SQLException | RuntimeException exception) {
+            reportTicketCreationFailure(exception, completion);
+        }
+    }
+
+    private void postTicketMessage(
+            net.dv8tion.jda.api.entities.Guild guild,
+            Member member,
+            String categoryName,
+            List<String> questions,
+            List<String> answers,
+            List<String> pingRoles,
+            TicketData ticket,
+            Consumer<String> completion
+    ) {
+        TextChannel channel = guild.getTextChannelById(ticket.channelId);
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
+                .setDescription("Opened by " + member.getAsMention() + ". Please describe your request here.")
+                .setFooter("Ticket ID: " + ticket.id);
+        for (int i = 0; i < Math.min(answers.size(), 5); i++) {
+            String answer = answers.get(i);
+            embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer, false);
+        }
+        String roleMentions = pingRoles.stream()
+                .map(roleId -> "<@&" + roleId + ">")
+                .reduce((left, right) -> left + " " + right)
+                .orElse("");
+        channel.sendMessage((roleMentions.isBlank() ? "" : roleMentions + " ") + member.getAsMention())
+                .setEmbeds(embed.build())
+                .setAllowedMentions(java.util.EnumSet.of(Message.MentionType.USER, Message.MentionType.ROLE))
+                .addComponents(
+                        ActionRow.of(
+                                Button.danger("ticket:close", "Close"),
+                                Button.primary("ticket:staff:claim", "Claim"),
+                                Button.secondary("ticket:staff:unclaim", "Unclaim"),
+                                Button.secondary("ticket:staff:transcript", "Transcript"),
+                                Button.secondary("ticket:staff:transfer", "Transfer")
+                        ),
+                        ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket"))
+                )
+                .queue(
+                        ignored -> completion.accept("Ticket created: <#" + ticket.channelId + ">"),
+                        error -> completion.accept(
+                                "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."
+                        )
+                );
+    }
+
+    private void reportTicketCreationFailure(Throwable exception, Consumer<String> completion) {
+        exception.printStackTrace();
+        if (exception instanceof IllegalArgumentException) {
             completion.accept(exception.getMessage());
-        } catch (InsufficientPermissionException exception) {
-            exception.printStackTrace();
+        } else if (exception instanceof InsufficientPermissionException) {
             completion.accept("I don't have permission to create ticket channels. Please ask a moderator to grant me Manage Channels and Manage Roles.");
-        } catch (SQLException exception) {
-            exception.printStackTrace();
+        } else if (exception instanceof SQLException) {
             completion.accept("Couldn't save your ticket. Please try again or contact a server moderator.");
-        } catch (RuntimeException exception) {
-            exception.printStackTrace();
-            completion.accept("Couldn't create your ticket. Please try again or contact a server moderator.");
+        } else {
+            completion.accept("Couldn't create the ticket channel. Check that I have permission to manage channels and access the configured category.");
         }
     }
 
