@@ -1,6 +1,5 @@
 package tickets;
 
-
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.Member;
@@ -17,9 +16,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Consumer;
 
+import commands.Ticket;
 import database.Database;
-
-
 
 public class TicketManager {
 
@@ -28,12 +26,13 @@ public class TicketManager {
             Member member,
             String categoryID,
             String categoryName,
+            Integer panelId,
             List<String> staffRoleIds,
             List<String> pingRoleIds,
             Consumer<TicketData> onSuccess,
-            Consumer<Throwable> onFailure
-    ) {
+            Consumer<Throwable> onFailure) {
         TicketData ticket = new TicketData();
+        ticket.panelId = panelId;
 
         Category category = categoryID == null ? null : guild.getCategoryById(categoryID);
         if (categoryID != null && category == null) {
@@ -57,8 +56,7 @@ public class TicketManager {
         channelAction.addPermissionOverride(
                 guild.getPublicRole(),
                 null,
-                EnumSet.of(Permission.VIEW_CHANNEL)
-        );
+                EnumSet.of(Permission.VIEW_CHANNEL));
         channelAction.addPermissionOverride(
                 member,
                 EnumSet.of(
@@ -67,17 +65,14 @@ public class TicketManager {
                         Permission.MESSAGE_ATTACH_FILES,
                         Permission.MESSAGE_EMBED_LINKS,
                         Permission.MESSAGE_ADD_REACTION,
-                        Permission.MESSAGE_HISTORY
-                ),
-                null
-        );
+                        Permission.MESSAGE_HISTORY),
+                null);
         EnumSet<Permission> staffPermissions = EnumSet.of(
                 Permission.VIEW_CHANNEL,
                 Permission.MESSAGE_SEND,
                 Permission.MESSAGE_ATTACH_FILES,
                 Permission.MESSAGE_EMBED_LINKS,
-                Permission.MESSAGE_HISTORY
-        );
+                Permission.MESSAGE_HISTORY);
         for (String roleId : java.util.stream.Stream.concat(
                 staffRoleIds.stream(), pingRoleIds.stream()).distinct().toList()) {
             var role = guild.getRoleById(roleId);
@@ -97,9 +92,9 @@ public class TicketManager {
                 Database.saveTicket(ticket);
             } catch (SQLException | RuntimeException exception) {
                 channel.delete().queue(
-                        ignored -> { },
-                        exception::addSuppressed
-                );
+                        ignored -> {
+                        },
+                        exception::addSuppressed);
                 onFailure.accept(exception);
                 return;
             }
@@ -107,24 +102,21 @@ public class TicketManager {
         }, onFailure);
     }
 
-
     public void deleteTicket(Guild guild, String channelID) {
 
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
         channel.delete().queue(
-            success -> {
-                try {
-                    Database.deleteTicketByChannelId(channelID);
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            },
-            error -> {
-                error.printStackTrace();
-            }
-        );
+                success -> {
+                    try {
+                        Database.deleteTicketByChannelId(channelID);
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+                },
+                error -> {
+                    error.printStackTrace();
+                });
     }
-
 
     public void closeTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) throws SQLException {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
@@ -142,7 +134,7 @@ public class TicketManager {
         String previousName = channel.getName();
         channel.getManager().setName("closed-" + previousName).queue();
         Member creator = guild.getMemberById(creatorID);
-        
+
         ticket.state = "CLOSED";
         Database.updateTicket(ticket);
 
@@ -155,7 +147,6 @@ public class TicketManager {
                 .queue();
 
     }
-
 
     public void reopenTicket(Guild guild, String channelID, String creatorID, EmbedBuilder embed) throws SQLException {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
@@ -186,7 +177,6 @@ public class TicketManager {
                 .addComponents(ActionRow.of(Button.danger("ticket:close", "Close ticket")))
                 .queue();
     }
-
 
     public String claimTicket(Guild guild, String channelID, String claimerID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
@@ -226,7 +216,6 @@ public class TicketManager {
 
         return "SUCCESS";
     }
-
 
     public String unclaimTicket(Guild guild, String channelID, EmbedBuilder embed) {
         TextChannel channel = guild.getChannelById(TextChannel.class, channelID);
@@ -304,4 +293,9 @@ public class TicketManager {
 
         return "SUCCESS";
     }
+
+
+    private boolean isTicketStaff(Member member, Ticket ticket) {
+    return true;
+        }
 }

@@ -25,7 +25,6 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
 public class TicketButton extends ListenerAdapter {
 
     @Override
@@ -88,8 +87,9 @@ public class TicketButton extends ListenerAdapter {
             event.getMessage().editMessageComponents(ActionRow.of(TicketPanel.categoryMenu(panelData))).queue();
             List<String> questions = Database.getPanelQuestions(panelId, categoryName);
             if (questions.isEmpty()) {
-                event.deferReply(true).queue(hook ->
-                        createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
+                event.deferReply(true)
+                        .queue(hook -> createTicket(event.getGuild(), event.getMember(), panelData, categoryName,
+                                List.of(),
                                 List.of(),
                                 message -> hook.editOriginal(message).queue()));
                 return;
@@ -102,7 +102,7 @@ public class TicketButton extends ListenerAdapter {
                 fields.add(Label.of(questions.get(index), answer));
             }
             Modal modal = Modal.create("ticket:form:" + panelId + ":" + panelData.categories.indexOf(categoryName),
-                            "New Ticket Request")
+                    "New Ticket Request")
                     .addComponents(fields)
                     .build();
             event.replyModal(modal).queue();
@@ -120,21 +120,22 @@ public class TicketButton extends ListenerAdapter {
 
     private void createTicket(ButtonInteractionEvent event, Integer panelId, String categoryName) {
         event.deferReply(true).queue(hook -> {
-        try {
-            TicketPanelData panelData = panelId == null
-                    ? null
-                    : Database.getPanelDataById(event.getGuild().getId(), panelId);
-            if (panelId != null && panelData == null) {
-                hook.editOriginal("That ticket panel no longer exists.").queue();
-                return;
+            try {
+                TicketPanelData panelData = panelId == null
+                        ? null
+                        : Database.getPanelDataById(event.getGuild().getId(), panelId);
+                if (panelId != null && panelData == null) {
+                    hook.editOriginal("That ticket panel no longer exists.").queue();
+                    return;
+                }
+                createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
+                        List.of(),
+                        message -> hook.editOriginal(message).queue());
+            } catch (SQLException | RuntimeException exception) {
+                exception.printStackTrace();
+                hook.editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.")
+                        .queue();
             }
-            createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
-                    List.of(),
-                    message -> hook.editOriginal(message).queue());
-        } catch (SQLException | RuntimeException exception) {
-            exception.printStackTrace();
-            hook.editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.").queue();
-        }
         });
     }
 
@@ -145,8 +146,7 @@ public class TicketButton extends ListenerAdapter {
             String categoryName,
             List<String> questions,
             List<String> answers,
-            Consumer<String> completion
-    ) {
+            Consumer<String> completion) {
         try {
             String categoryId = panelData != null && panelData.ticketCategoryId != null
                     ? panelData.ticketCategoryId
@@ -158,6 +158,7 @@ public class TicketButton extends ListenerAdapter {
                     member,
                     categoryId,
                     categoryName,
+                    panelData == null ? null : panelData.id,
                     staffRoles,
                     pingRoles,
                     ticket -> {
@@ -168,8 +169,7 @@ public class TicketButton extends ListenerAdapter {
                             reportTicketCreationFailure(exception, completion);
                         }
                     },
-                    exception -> reportTicketCreationFailure(exception, completion)
-            );
+                    exception -> reportTicketCreationFailure(exception, completion));
         } catch (SQLException | RuntimeException exception) {
             reportTicketCreationFailure(exception, completion);
         }
@@ -183,8 +183,7 @@ public class TicketButton extends ListenerAdapter {
             List<String> answers,
             List<String> pingRoles,
             TicketData ticket,
-            Consumer<String> completion
-    ) {
+            Consumer<String> completion) {
         TextChannel channel = guild.getTextChannelById(ticket.channelId);
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
@@ -192,7 +191,8 @@ public class TicketButton extends ListenerAdapter {
                 .setFooter("Ticket ID: " + ticket.id);
         for (int i = 0; i < Math.min(answers.size(), 5); i++) {
             String answer = answers.get(i);
-            embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer, false);
+            embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer,
+                    false);
         }
         String roleMentions = pingRoles.stream()
                 .map(roleId -> "<@&" + roleId + ">")
@@ -207,16 +207,12 @@ public class TicketButton extends ListenerAdapter {
                                 Button.primary("ticket:staff:claim", "Claim"),
                                 Button.secondary("ticket:staff:unclaim", "Unclaim"),
                                 Button.secondary("ticket:staff:transcript", "Transcript"),
-                                Button.secondary("ticket:staff:transfer", "Transfer")
-                        ),
-                        ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket"))
-                )
+                                Button.secondary("ticket:staff:transfer", "Transfer")),
+                        ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket")))
                 .queue(
                         ignored -> completion.accept("Ticket created: <#" + ticket.channelId + ">"),
                         error -> completion.accept(
-                                "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."
-                        )
-                );
+                                "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."));
     }
 
     private void reportTicketCreationFailure(Throwable exception, Consumer<String> completion) {
@@ -224,11 +220,13 @@ public class TicketButton extends ListenerAdapter {
         if (exception instanceof IllegalArgumentException) {
             completion.accept(exception.getMessage());
         } else if (exception instanceof InsufficientPermissionException) {
-            completion.accept("I don't have permission to create ticket channels. Please ask a moderator to grant me Manage Channels and Manage Roles.");
+            completion.accept(
+                    "I don't have permission to create ticket channels. Please ask a moderator to grant me Manage Channels and Manage Roles.");
         } else if (exception instanceof SQLException) {
             completion.accept("Couldn't save your ticket. Please try again or contact a server moderator.");
         } else {
-            completion.accept("Couldn't create the ticket channel. Check that I have permission to manage channels and access the configured category.");
+            completion.accept(
+                    "Couldn't create the ticket channel. Check that I have permission to manage channels and access the configured category.");
         }
     }
 
@@ -279,14 +277,16 @@ public class TicketButton extends ListenerAdapter {
             event.reply("This control can only be used inside a ticket channel.").setEphemeral(true).queue();
             return;
         }
-        if (!event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-            event.reply("Only staff with Manage Channels can use this control.").setEphemeral(true).queue();
-            return;
-        }
         try {
             TicketData ticket = Database.getTicketByChannelId(channel.getId());
             if (ticket == null) {
                 event.reply("This channel isn't an active ticket.").setEphemeral(true).queue();
+                return;
+            }
+            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
+                event.reply("Only this ticket's configured staff roles can use this control.")
+                        .setEphemeral(true)
+                        .queue();
                 return;
             }
             if ("transfer".equals(action)) {
@@ -306,11 +306,12 @@ public class TicketButton extends ListenerAdapter {
                                 hook.editOriginal("Ticket deleted.").queue();
                             } catch (SQLException exception) {
                                 exception.printStackTrace();
-                                hook.editOriginal("Channel deleted, but its ticket record could not be removed.").queue();
+                                hook.editOriginal("Channel deleted, but its ticket record could not be removed.")
+                                        .queue();
                             }
                         },
-                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.").queue()
-                ));
+                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
+                                .queue()));
                 return;
             }
             if ("transcript".equals(action)) {
@@ -345,30 +346,109 @@ public class TicketButton extends ListenerAdapter {
         }
     }
 
-    private void submitTransfer(ModalInteractionEvent event) {
-        if (!(event.getChannel() instanceof TextChannel channel)
-                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-            event.reply("Only ticket staff can transfer tickets.").setEphemeral(true).queue();
-            return;
+    private boolean isTicketStaff(Member member, TicketData ticket, String guildId) throws SQLException {
+        if (member.hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
+            return true;
         }
-        String targetText = event.getValue("target").getAsString().trim();
-        Matcher matcher = Pattern.compile("^(?:<@!?)?(\\d{17,20})>?$").matcher(targetText);
-        if (!matcher.matches()) {
-            event.reply("Enter a valid member mention or ID.").setEphemeral(true).queue();
-            return;
+        if (ticket.panelId == null) {
+            return false;
         }
-        Member target = event.getGuild().getMemberById(matcher.group(1));
-        if (target == null || !target.hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-            event.reply("The selected member must be in this server and have Manage Channels.")
-                    .setEphemeral(true).queue();
-            return;
+        TicketPanelData panel = Database.getPanelDataById(guildId, ticket.panelId);
+
+        if (panel == null || panel.staffRoles == null) {
+            return false;
         }
-        String result = new TicketManager().transferTicket(event.getGuild(), channel.getId(), target.getId(),
-                new EmbedBuilder().setTitle("Ticket transferred")
-                        .setDescription("Transferred to " + target.getAsMention() + " by "
-                                + event.getUser().getAsMention() + "."));
-        replyStaffResult(event, result, "Ticket transferred to " + target.getAsMention() + ".");
+        return member.getRoles().stream()
+                .anyMatch(role -> panel.staffRoles.contains(role.getId()));
     }
+
+
+private void submitTransfer(ModalInteractionEvent event) {
+    if (!(event.getChannel() instanceof TextChannel channel)
+            || event.getMember() == null) {
+        event.reply("This control can only be used inside a ticket channel.")
+                .setEphemeral(true)
+                .queue();
+        return;
+    }
+
+    try {
+        TicketData ticket = Database.getTicketByChannelId(channel.getId());
+
+        if (ticket == null) {
+            event.reply("This channel isn't an active ticket.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
+            event.reply("Only this ticket's configured staff roles can transfer it.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        var targetValue = event.getValue("target");
+
+        if (targetValue == null || targetValue.getAsString().isBlank()) {
+            event.reply("Please enter a staff member's mention or ID.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        String targetText = targetValue.getAsString().trim();
+        Matcher matcher = Pattern.compile("^(?:<@!?)?(\\d{17,20})>?$")
+                .matcher(targetText);
+
+        if (!matcher.matches()) {
+            event.reply("Enter a valid member mention or ID.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        Member target = event.getGuild().getMemberById(matcher.group(1));
+
+        if (target == null) {
+            event.reply("That member isn't in this server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if (!isTicketStaff(target, ticket, event.getGuild().getId())) {
+            event.reply("The selected member must have a staff role configured for this ticket's panel.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        String result = new TicketManager().transferTicket(
+                event.getGuild(),
+                channel.getId(),
+                target.getId(),
+                new EmbedBuilder()
+                        .setTitle("Ticket transferred")
+                        .setDescription("Transferred to " + target.getAsMention()
+                                + " by " + event.getUser().getAsMention() + ".")
+        );
+
+        replyStaffResult(
+                event,
+                result,
+                "Ticket transferred to " + target.getAsMention() + "."
+        );
+
+    } catch (SQLException exception) {
+        exception.printStackTrace();
+        event.reply("Couldn't load the ticket record or staff settings.")
+                .setEphemeral(true)
+                .queue();
+    }
+}
+
 
     private void replyStaffResult(ModalInteractionEvent event, String result, String successMessage) {
         String message = switch (result) {
@@ -431,8 +511,7 @@ public class TicketButton extends ListenerAdapter {
                     channel.getId(),
                     ticket.creatorId,
                     new EmbedBuilder().setTitle("Ticket closed")
-                            .setDescription("Closed by " + event.getUser().getAsMention() + ".")
-            );
+                            .setDescription("Closed by " + event.getUser().getAsMention() + "."));
             event.reply("Ticket closed.")
                     .setEphemeral(true)
                     .queue();
@@ -479,8 +558,7 @@ public class TicketButton extends ListenerAdapter {
                     channel.getId(),
                     ticket.creatorId,
                     new EmbedBuilder().setTitle("Ticket reopened")
-                            .setDescription("Reopened by " + event.getUser().getAsMention() + ".")
-            );
+                            .setDescription("Reopened by " + event.getUser().getAsMention() + "."));
             event.reply("Ticket reopened.")
                     .setEphemeral(true)
                     .queue();

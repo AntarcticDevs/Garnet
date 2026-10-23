@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import utils.ConsoleLogger;
 
 
 
@@ -39,7 +40,7 @@ public class Avatar extends ListenerAdapter implements Command{
             embed.setTitle("🖼️ User Avatar of " + member.getUser().getName());
 
                 String avatar = member.getUser().getEffectiveAvatarUrl();
-                System.out.print(avatar);
+                ConsoleLogger.logConsole(avatar);
 
                 if (avatar != null) {
                     if (avatar.contains("/a_")) {
@@ -67,4 +68,3 @@ public class Avatar extends ListenerAdapter implements Command{
             };
         }
     }
-

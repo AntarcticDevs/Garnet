@@ -63,5 +63,5 @@ Features, documentation, and policies may change as development continues.
 
 ## 🔗 Links
 
-- [Discord Server](https://dsc.gg/enderlabs)
+- [Discord Server](https://dsc.gg/garnetbot)
 - [Source Code](https://github.com/EnderKnight7op/Garnet)

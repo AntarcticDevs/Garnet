@@ -11,7 +11,6 @@ import java.sql.PreparedStatement;
 import tickets.TicketData;
 import tickets.TicketPanelData;
 
-
 public class Database {
 
     private static final String URL = "jdbc:sqlite:garnet.db";
@@ -23,9 +22,10 @@ public class Database {
         }
         return connection;
     }
+
     public static void initialize() throws SQLException {
         try (Connection connection = getConnection();
-            Statement statement = connection.createStatement()) {
+                Statement statement = connection.createStatement()) {
 
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS embeds (
@@ -53,7 +53,6 @@ public class Database {
             addColumnIfMissing(connection, "embeds", "author_image TEXT");
             addColumnIfMissing(connection, "embeds", "colour TEXT");
             addColumnIfMissing(connection, "embeds", "thumbnail_url TEXT");
-            
 
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS embed_fields (
@@ -79,8 +78,9 @@ public class Database {
                     )
                     """);
             addColumnIfMissing(connection, "tickets", "category_name TEXT");
+            addColumnIfMissing(connection, "tickets", "panel_id INTEGER");
 
-                    ///////////////////////////////////// TICKET PANEL
+            ///////////////////////////////////// TICKET PANEL
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panels (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -154,7 +154,7 @@ public class Database {
                     )
                     """);
 
-                statement.execute("""
+            statement.execute("""
                     CREATE TABLE IF NOT EXISTS guild_rule_embeds (
                     guild_id TEXT NOT NULL,
                     position INTEGER NOT NULL,
@@ -166,37 +166,37 @@ public class Database {
                     """);
 
             statement.execute("""
-                CREATE TABLE IF NOT EXISTS ticket_config (
-                    guild_id TEXT PRIMARY KEY,
-                    category_id TEXT
-                )
-                    """);
-
+                    CREATE TABLE IF NOT EXISTS ticket_config (
+                        guild_id TEXT PRIMARY KEY,
+                        category_id TEXT
+                    )
+                        """);
 
             statement.execute("""
-                CREATE TABLE IF NOT EXISTS welcomer (
-                    guild_id TEXT PRIMARY KEY,
-                    channel_id TEXT,
-                    embed_id INTEGER
-                )
-                    """);
+                    CREATE TABLE IF NOT EXISTS welcomer (
+                        guild_id TEXT PRIMARY KEY,
+                        channel_id TEXT,
+                        embed_id INTEGER
+                    )
+                        """);
 
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
 
-                statement.execute("""
+            statement.execute("""
                     INSERT OR IGNORE INTO guild_rule_embeds (guild_id, position, embed_id)
                     SELECT guild_id, 1, embed_id FROM guild_rules
                     """);
         }
     }
 
-    private static void addColumnIfMissing(Connection connection, String tableName, String columnDefinition) throws SQLException {
+    private static void addColumnIfMissing(Connection connection, String tableName, String columnDefinition)
+            throws SQLException {
         String columnName = columnDefinition.substring(0, columnDefinition.indexOf(' '));
         String tableInfoSql = "PRAGMA table_info(" + tableName + ")";
         boolean columnExists = false;
 
         try (Statement statement = connection.createStatement();
-             ResultSet resultSet = statement.executeQuery(tableInfoSql)) {
+                ResultSet resultSet = statement.executeQuery(tableInfoSql)) {
             while (resultSet.next()) {
                 if (columnName.equals(resultSet.getString("name"))) {
                     columnExists = true;
@@ -212,7 +212,6 @@ public class Database {
         }
     }
 
-
     public static void saveTicket(TicketData ticket) throws SQLException {
 
         String sql = """
@@ -223,12 +222,13 @@ public class Database {
                     claimer_id,
                     claim_state,
                     category_name
+                    panel_id
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             statement.setString(1, ticket.channelId);
             statement.setString(2, ticket.creatorId);
@@ -237,33 +237,39 @@ public class Database {
             statement.setString(5, ticket.claimState);
             statement.setString(6, ticket.categoryName);
 
+            if (ticket.panelId == null) {
+                statement.setNull(7, java.sql.Types.INTEGER);
+            } else {
+                statement.setInt(7, ticket.panelId);
+            }
+
             statement.executeUpdate();
 
-        try (ResultSet resultSet = statement.getGeneratedKeys()) {
-            if (resultSet.next()) {
-                ticket.id = resultSet.getInt(1);
+            try (ResultSet resultSet = statement.getGeneratedKeys()) {
+                if (resultSet.next()) {
+                    ticket.id = resultSet.getInt(1);
+                }
             }
         }
-        }
     }
-
 
     public static void updateTicket(TicketData ticket) throws SQLException {
 
         String sql = """
                 UPDATE tickets
-                SET
-                    channel_id = ?,
-                    creator_id = ?,
-                    state = ?,
-                    claimer_id = ?,
-                    claim_state = ?,
-                    category_name = ?
-                WHERE id = ?
+                    SET
+                        channel_id = ?,
+                        creator_id = ?,
+                        state = ?,
+                        claimer_id = ?,
+                        claim_state = ?,
+                        category_name = ?,
+                        panel_id = ?
+                    WHERE id = ?
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, ticket.channelId);
             statement.setString(2, ticket.creatorId);
@@ -271,12 +277,18 @@ public class Database {
             statement.setString(4, ticket.claimerId);
             statement.setString(5, ticket.claimState);
             statement.setString(6, ticket.categoryName);
-            statement.setInt(7, ticket.id);
+
+            if (ticket.panelId == null) {
+                statement.setNull(7, java.sql.Types.INTEGER);
+            } else {
+                statement.setInt(7, ticket.panelId);
+            }
+
+            statement.setInt(8, ticket.id);
 
             statement.executeUpdate();
         }
     }
-
 
     public static TicketData getTicketByChannelId(String ticketChannelId) throws SQLException {
         TicketData ticket = new TicketData();
@@ -287,29 +299,28 @@ public class Database {
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
-                statement.setString(1, ticketChannelId);
-                ResultSet resultSet = statement.executeQuery();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, ticketChannelId);
+            ResultSet resultSet = statement.executeQuery();
 
-                if (resultSet.next()) {
-                    ticket.channelId = resultSet.getString("channel_id");
-                    ticket.id = resultSet.getInt("id");
-                    ticket.creatorId = resultSet.getString("creator_id");
-                    ticket.state = resultSet.getString("state");
-                    ticket.claimerId = resultSet.getString("claimer_id");
-                    ticket.claimState = resultSet.getString("claim_state");
-                    ticket.categoryName = resultSet.getString("category_name");
+            if (resultSet.next()) {
+                ticket.channelId = resultSet.getString("channel_id");
+                ticket.id = resultSet.getInt("id");
+                ticket.creatorId = resultSet.getString("creator_id");
+                ticket.state = resultSet.getString("state");
+                ticket.claimerId = resultSet.getString("claimer_id");
+                ticket.claimState = resultSet.getString("claim_state");
+                ticket.categoryName = resultSet.getString("category_name");
+                int panelId = resultSet.getInt("panel_id");
+                ticket.panelId = resultSet.wasNull() ? null : panelId;
 
-
-                    return ticket;
-                }
-
-                return null;
-        
-                
+                return ticket;
             }
-    }
 
+            return null;
+
+        }
+    }
 
     public static void deleteTicketByChannelId(String channelId) throws SQLException {
 
@@ -319,13 +330,12 @@ public class Database {
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, channelId);
             statement.executeUpdate();
         }
     }
-
 
     public static void deleteTicketById(int ticketId) throws SQLException {
 
@@ -335,23 +345,22 @@ public class Database {
                 """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setInt(1, ticketId);
             statement.executeUpdate();
         }
     }
 
-
     public static void saveTicketCategory(String guildId, String categoryId) throws SQLException {
         String sql = """
-            INSERT INTO ticket_config (guild_id, category_id)
-            VALUES (?, ?)
-            ON CONFLICT(guild_id) DO UPDATE SET category_id = excluded.category_id
-            """;
+                INSERT INTO ticket_config (guild_id, category_id)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET category_id = excluded.category_id
+                """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, guildId);
             statement.setString(2, categoryId);
@@ -360,16 +369,15 @@ public class Database {
         }
     }
 
-
     public static String getTicketCategory(String guildId) throws SQLException {
         String sql = """
-            SELECT category_id
-            FROM ticket_config
-            WHERE guild_id = ?
-            """;
+                SELECT category_id
+                FROM ticket_config
+                WHERE guild_id = ?
+                """;
 
         try (Connection connection = getConnection();
-            PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
 
             statement.setString(1, guildId);
 
@@ -383,7 +391,6 @@ public class Database {
         return null;
     }
 
-    
     public static void savePanel(TicketPanelData panel) throws SQLException {
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
@@ -477,14 +484,12 @@ public class Database {
         }
     }
 
-
     private static void replacePanelValues(
             Connection connection,
             int panelId,
             String tableName,
             String valueColumn,
-            List<String> values
-    ) throws SQLException {
+            List<String> values) throws SQLException {
         // Table and column names are internal constants selected by callers.
         try (PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM " + tableName + " WHERE panel_id = ?")) {
@@ -512,13 +517,11 @@ public class Database {
         }
     }
 
-
     private static List<String> loadPanelValues(
             Connection connection,
             int panelId,
             String tableName,
-            String valueColumn
-    ) throws SQLException {
+            String valueColumn) throws SQLException {
         List<String> values = new java.util.ArrayList<>();
         String sql = "SELECT " + valueColumn + " FROM " + tableName
                 + " WHERE panel_id = ? ORDER BY position, id";
@@ -532,7 +535,6 @@ public class Database {
         }
         return values;
     }
-
 
     private static TicketPanelData readPanelData(Connection connection, ResultSet resultSet) throws SQLException {
         TicketPanelData panelData = new TicketPanelData();
@@ -553,11 +555,10 @@ public class Database {
         return panelData;
     }
 
-
     public static TicketPanelData getPanelData(String guildId, String panelName) throws SQLException {
         String sql = "SELECT * FROM ticket_panels WHERE guild_id = ? AND name = ?";
         try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, guildId);
             statement.setString(2, panelName);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -566,11 +567,10 @@ public class Database {
         }
     }
 
-
     public static TicketPanelData getPanelDataById(String guildId, int panelId) throws SQLException {
         String sql = "SELECT * FROM ticket_panels WHERE guild_id = ? AND id = ?";
         try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, guildId);
             statement.setInt(2, panelId);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -579,11 +579,10 @@ public class Database {
         }
     }
 
-
     public static boolean updatePanelContent(String guildId, int panelId, String content) throws SQLException {
         String sql = "UPDATE ticket_panels SET content = ? WHERE guild_id = ? AND id = ?";
         try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
+                PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, content);
             statement.setString(2, guildId);
             statement.setInt(3, panelId);
@@ -594,12 +593,12 @@ public class Database {
     public static List<String> getPanelQuestions(int panelId, String categoryName) throws SQLException {
         List<String> questions = new java.util.ArrayList<>();
         try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement("""
-                     SELECT prompt
-                     FROM ticket_panel_questions
-                     WHERE panel_id = ? AND category_name = ?
-                     ORDER BY position
-                     """)) {
+                PreparedStatement statement = connection.prepareStatement("""
+                        SELECT prompt
+                        FROM ticket_panel_questions
+                        WHERE panel_id = ? AND category_name = ?
+                        ORDER BY position
+                        """)) {
             statement.setInt(1, panelId);
             statement.setString(2, categoryName);
             try (ResultSet resultSet = statement.executeQuery()) {
@@ -611,7 +610,8 @@ public class Database {
         return questions;
     }
 
-    public static void savePanelQuestions(int panelId, String categoryName, List<String> questions) throws SQLException {
+    public static void savePanelQuestions(int panelId, String categoryName, List<String> questions)
+            throws SQLException {
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
             try {
@@ -640,5 +640,5 @@ public class Database {
                 throw exception;
             }
         }
-}
     }
+}

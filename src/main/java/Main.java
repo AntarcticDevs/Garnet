@@ -27,6 +27,7 @@ import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 
 import database.Database;
 import java.sql.SQLException;
+import utils.ConsoleLogger;
 
 
 
@@ -71,8 +72,8 @@ public class Main {
                 .build()
                 .awaitReady();
 
-        System.out.println("-----------------------𝐁𝐨𝐭 𝐦𝐚𝐝𝐞 𝐛𝐲 𝐄𝐧𝐝𝐞𝐫𝐊𝐧𝐢𝐠𝐡𝐭𝟕𝐨𝐩-----------------------");       
-        System.out.println("✅ Garnet is online!");
+        ConsoleLogger.logConsole("-----------------------𝐁𝐨𝐭 𝐦𝐚𝐝𝐞 𝐛𝐲 𝐄𝐧𝐝𝐞𝐫𝐊𝐧𝐢𝐠𝐡𝐭𝟕𝐨𝐩-----------------------");
+        ConsoleLogger.logConsole("✅ Garnet is online!");
 
         List<Command> commands = List.<Command>of(
                 new Info(),

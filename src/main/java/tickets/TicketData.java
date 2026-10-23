@@ -9,5 +9,6 @@ public class TicketData {
     public String claimerId;
     public String claimState;
     public String categoryName;
+    public Integer panelId;
 
 }
