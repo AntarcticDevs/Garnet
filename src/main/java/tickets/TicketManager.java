@@ -15,8 +15,6 @@ import java.sql.SQLException;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Consumer;
-
-import commands.Ticket;
 import database.Database;
 
 public class TicketManager {
@@ -293,9 +291,4 @@ public class TicketManager {
 
         return "SUCCESS";
     }
-
-
-    private boolean isTicketStaff(Member member, Ticket ticket) {
-    return true;
-        }
 }

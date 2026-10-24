@@ -362,93 +362,89 @@ public class TicketButton extends ListenerAdapter {
                 .anyMatch(role -> panel.staffRoles.contains(role.getId()));
     }
 
+    private void submitTransfer(ModalInteractionEvent event) {
+        if (!(event.getChannel() instanceof TextChannel channel)
+                || event.getMember() == null) {
+            event.reply("This control can only be used inside a ticket channel.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
 
-private void submitTransfer(ModalInteractionEvent event) {
-    if (!(event.getChannel() instanceof TextChannel channel)
-            || event.getMember() == null) {
-        event.reply("This control can only be used inside a ticket channel.")
-                .setEphemeral(true)
-                .queue();
-        return;
+        try {
+            TicketData ticket = Database.getTicketByChannelId(channel.getId());
+
+            if (ticket == null) {
+                event.reply("This channel isn't an active ticket.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
+                event.reply("Only this ticket's configured staff roles can transfer it.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            var targetValue = event.getValue("target");
+
+            if (targetValue == null || targetValue.getAsString().isBlank()) {
+                event.reply("Please enter a staff member's mention or ID.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            String targetText = targetValue.getAsString().trim();
+            Matcher matcher = Pattern.compile("^(?:<@!?)?(\\d{17,20})>?$")
+                    .matcher(targetText);
+
+            if (!matcher.matches()) {
+                event.reply("Enter a valid member mention or ID.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            Member target = event.getGuild().getMemberById(matcher.group(1));
+
+            if (target == null) {
+                event.reply("That member isn't in this server.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            if (!isTicketStaff(target, ticket, event.getGuild().getId())) {
+                event.reply("The selected member must have a staff role configured for this ticket's panel.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            String result = new TicketManager().transferTicket(
+                    event.getGuild(),
+                    channel.getId(),
+                    target.getId(),
+                    new EmbedBuilder()
+                            .setTitle("Ticket transferred")
+                            .setDescription("Transferred to " + target.getAsMention()
+                                    + " by " + event.getUser().getAsMention() + "."));
+
+            replyStaffResult(
+                    event,
+                    result,
+                    "Ticket transferred to " + target.getAsMention() + ".");
+
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            event.reply("Couldn't load the ticket record or staff settings.")
+                    .setEphemeral(true)
+                    .queue();
+        }
     }
-
-    try {
-        TicketData ticket = Database.getTicketByChannelId(channel.getId());
-
-        if (ticket == null) {
-            event.reply("This channel isn't an active ticket.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-            event.reply("Only this ticket's configured staff roles can transfer it.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        var targetValue = event.getValue("target");
-
-        if (targetValue == null || targetValue.getAsString().isBlank()) {
-            event.reply("Please enter a staff member's mention or ID.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        String targetText = targetValue.getAsString().trim();
-        Matcher matcher = Pattern.compile("^(?:<@!?)?(\\d{17,20})>?$")
-                .matcher(targetText);
-
-        if (!matcher.matches()) {
-            event.reply("Enter a valid member mention or ID.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        Member target = event.getGuild().getMemberById(matcher.group(1));
-
-        if (target == null) {
-            event.reply("That member isn't in this server.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        if (!isTicketStaff(target, ticket, event.getGuild().getId())) {
-            event.reply("The selected member must have a staff role configured for this ticket's panel.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        String result = new TicketManager().transferTicket(
-                event.getGuild(),
-                channel.getId(),
-                target.getId(),
-                new EmbedBuilder()
-                        .setTitle("Ticket transferred")
-                        .setDescription("Transferred to " + target.getAsMention()
-                                + " by " + event.getUser().getAsMention() + ".")
-        );
-
-        replyStaffResult(
-                event,
-                result,
-                "Ticket transferred to " + target.getAsMention() + "."
-        );
-
-    } catch (SQLException exception) {
-        exception.printStackTrace();
-        event.reply("Couldn't load the ticket record or staff settings.")
-                .setEphemeral(true)
-                .queue();
-    }
-}
-
 
     private void replyStaffResult(ModalInteractionEvent event, String result, String successMessage) {
         String message = switch (result) {
@@ -492,9 +488,8 @@ private void submitTransfer(ModalInteractionEvent event) {
                         .queue();
                 return;
             }
-            if (!ticket.creatorId.equals(event.getMember().getId())
-                    && !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-                event.reply("Only the ticket creator or a channel manager can close this ticket.")
+            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
+                event.reply("You don't have permission to close this ticket.")
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -539,9 +534,8 @@ private void submitTransfer(ModalInteractionEvent event) {
                         .queue();
                 return;
             }
-            if (!ticket.creatorId.equals(event.getMember().getId())
-                    && !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-                event.reply("Only the ticket creator or a channel manager can reopen this ticket.")
+            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
+                event.reply("You don't have permission to reopen this ticket.")
                         .setEphemeral(true)
                         .queue();
                 return;
