@@ -314,19 +314,32 @@ public class TicketButton extends ListenerAdapter {
                                 .queue()));
                 return;
             }
+
             if ("transcript".equals(action)) {
                 event.deferReply(true).queue(hook -> {
                     try {
                         byte[] transcript = new TranscriptManager().createTranscript(channel);
-                        hook.sendFiles(FileUpload.fromData(transcript, channel.getName() + "-transcript.txt"))
-                                .queue(null, error -> hook.editOriginal("Couldn't upload the transcript.").queue());
+
+                        hook.sendFiles(FileUpload.fromData(
+                                transcript, channel.getName() + "-transcript.txt"))
+                                .queue(null, error ->
+                                        hook.editOriginal("Couldn't upload the transcript.")
+                                                .queue(null, editError ->
+                                                        System.err.println(
+                                                                "Failed to send upload error: " + editError)));
                     } catch (RuntimeException exception) {
+                        System.err.println("Transcript generation failed:");
                         exception.printStackTrace();
-                        hook.editOriginal("Couldn't create the transcript.").queue();
+
+                        hook.editOriginal("Couldn't create the transcript.")
+                                .queue(null, error ->
+                                        System.err.println(
+                                                "Failed to send transcript error message: " + error));
                     }
                 });
                 return;
             }
+
             if ("claim".equals(action)) {
                 String result = new TicketManager().claimTicket(event.getGuild(), channel.getId(),
                         event.getMember().getId(), new EmbedBuilder().setTitle("Ticket claimed")
