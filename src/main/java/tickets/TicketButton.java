@@ -284,7 +284,7 @@ public class TicketButton extends ListenerAdapter {
                 return;
             }
             if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("Only this ticket's configured staff roles can use this control.")
+                event.reply("You don't have permission to use this control.")
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -382,7 +382,7 @@ public class TicketButton extends ListenerAdapter {
             }
 
             if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("Only this ticket's configured staff roles can transfer it.")
+                event.reply("You don't have permission to transfer this ticket.")
                         .setEphemeral(true)
                         .queue();
                 return;
