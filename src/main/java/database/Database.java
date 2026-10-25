@@ -215,17 +215,17 @@ public class Database {
     public static void saveTicket(TicketData ticket) throws SQLException {
 
         String sql = """
-                INSERT INTO tickets (
-                    channel_id,
-                    creator_id,
-                    state,
-                    claimer_id,
-                    claim_state,
-                    category_name
-                    panel_id
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """;
+            INSERT INTO tickets (
+                channel_id,
+                creator_id,
+                state,
+                claimer_id,
+                claim_state,
+                category_name,
+                panel_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """;
 
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
