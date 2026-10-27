@@ -1,34 +1,88 @@
 package tickets;
 
-
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.buttons.ButtonStyle;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.requests.RestAction;
 
+import java.awt.Color;
+import java.util.Locale;
+
 import utils.EmbedHelpers;
 
 
 public class TicketPanel {
-    public RestAction<Message> panel(TicketPanelData panelData, TextChannel channel) {
-        EmbedBuilder embed = new EmbedBuilder()
-                .setTitle(panelData.name)
-                .setDescription(panelData.content == null || panelData.content.isBlank()
-                        ? "Use the button below to create a ticket."
-                        : panelData.content);
+    public static final int DEFAULT_COLOUR = 0x5865F2;
 
-        EmbedHelpers.setDefaultFooter(embed, channel.getGuild());
-        String customId = panelData.id > 0 ? "ticket:create:" + panelData.id : "ticket:support";
-        if (!panelData.categories.isEmpty()) {
-            return channel.sendMessageEmbeds(embed.build())
-                    .addComponents(ActionRow.of(categoryMenu(panelData)));
+    /** Sends the panel as a new message. */
+    public RestAction<Message> panel(TicketPanelData panelData, TextChannel channel) {
+        return channel.sendMessageEmbeds(buildEmbed(panelData, channel.getGuild()))
+                .addComponents(buildActionRow(panelData));
+    }
+
+    /**
+     * Publishes the panel: edits the previously published message when it still exists,
+     * otherwise sends a fresh one. The caller stores the resulting message's channel and ID.
+     */
+    public RestAction<Message> publish(TicketPanelData panelData, TextChannel channel) {
+        MessageEmbed embed = buildEmbed(panelData, channel.getGuild());
+        ActionRow row = buildActionRow(panelData);
+        boolean sameChannel = channel.getId().equals(panelData.channelId);
+        if (panelData.messageId == null || !sameChannel) {
+            return channel.sendMessageEmbeds(embed).addComponents(row);
         }
-        return channel.sendMessageEmbeds(embed.build())
-                .addComponents(ActionRow.of(Button.primary(customId, "Create ticket")));
+        return channel.editMessageEmbedsById(panelData.messageId, embed)
+                .setComponents(row)
+                .onErrorFlatMap(error -> channel.sendMessageEmbeds(embed).addComponents(row));
+    }
+
+    /** The panel embed exactly as members will see it. */
+    public MessageEmbed buildEmbed(TicketPanelData panelData, Guild guild) {
+        EmbedBuilder embed = new EmbedBuilder()
+                .setTitle(blankToNull(panelData.embedTitle) == null ? panelData.name : panelData.embedTitle)
+                .setDescription(blankToNull(panelData.content) == null
+                        ? "Use the button below to create a ticket."
+                        : panelData.content)
+                .setColor(parseColour(panelData.embedColour));
+
+        if (blankToNull(panelData.imageUrl) != null) {
+            embed.setImage(panelData.imageUrl);
+        }
+        if (blankToNull(panelData.thumbnailUrl) != null) {
+            embed.setThumbnail(panelData.thumbnailUrl);
+        }
+        if (blankToNull(panelData.footerText) != null) {
+            embed.setFooter(panelData.footerText);
+        } else {
+            EmbedHelpers.setDefaultFooter(embed, guild);
+        }
+        return embed.build();
+    }
+
+    /** The category dropdown when the panel has categories, otherwise the create button. */
+    public ActionRow buildActionRow(TicketPanelData panelData) {
+        if (!panelData.categories.isEmpty()) {
+            return ActionRow.of(categoryMenu(panelData));
+        }
+        return ActionRow.of(createButton(panelData));
+    }
+
+    public static Button createButton(TicketPanelData panelData) {
+        String customId = panelData.id > 0 ? "ticket:create:" + panelData.id : "ticket:support";
+        String label = blankToNull(panelData.buttonLabel) == null
+                ? TicketPanelData.DEFAULT_BUTTON_LABEL
+                : panelData.buttonLabel;
+        Button button = Button.of(parseStyle(panelData.buttonStyle), customId, label);
+        Emoji emoji = parseEmoji(panelData.buttonEmoji);
+        return emoji == null ? button : button.withEmoji(emoji);
     }
 
     static StringSelectMenu categoryMenu(TicketPanelData panelData) {
@@ -39,24 +93,45 @@ public class TicketPanel {
         return categories.build();
     }
 
+    // ---- parsing helpers shared with the editor -------------------------------------------
 
-    public RestAction<Message> panel(EmbedBuilder embed, TextChannel channel, Button button) {
-        if (embed == null) {
-            embed = new EmbedBuilder();
-            embed.setTitle("Create a ticket")
-                 .setDescription("Use the button below to create a ticket");
+    public static ButtonStyle parseStyle(String style) {
+        if (style == null) {
+            return ButtonStyle.PRIMARY;
         }
+        return switch (style.toUpperCase(Locale.ROOT)) {
+            case "SECONDARY", "GREY", "GRAY" -> ButtonStyle.SECONDARY;
+            case "SUCCESS", "GREEN" -> ButtonStyle.SUCCESS;
+            case "DANGER", "RED" -> ButtonStyle.DANGER;
+            default -> ButtonStyle.PRIMARY;
+        };
+    }
 
-        EmbedHelpers.setDefaultFooter(embed, channel.getGuild());
-
-        Button finalButton;
-        if (button == null) {
-            finalButton = Button.primary("ticket:support", "Support");
-        } else {
-            finalButton = button;
+    /** Returns the parsed emoji, or null when blank or invalid. */
+    public static Emoji parseEmoji(String value) {
+        if (blankToNull(value) == null) {
+            return null;
         }
+        try {
+            return Emoji.fromFormatted(value.trim());
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
+    }
 
-        return channel.sendMessageEmbeds(embed.build())
-                .addComponents(ActionRow.of(finalButton));
+    public static Color parseColour(String hex) {
+        if (blankToNull(hex) == null) {
+            return new Color(DEFAULT_COLOUR);
+        }
+        try {
+            String digits = hex.trim().startsWith("#") ? hex.trim().substring(1) : hex.trim();
+            return new Color(Integer.parseInt(digits, 16));
+        } catch (NumberFormatException exception) {
+            return new Color(DEFAULT_COLOUR);
+        }
+    }
+
+    static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

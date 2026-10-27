@@ -101,6 +101,17 @@ public class Database {
             addColumnIfMissing(connection, "ticket_panels", "total_ping_roles INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "ticket_category_id TEXT");
 
+            addColumnIfMissing(connection, "ticket_panels", "embed_title TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "embed_colour TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "image_url TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "thumbnail_url TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "footer_text TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "button_label TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "button_emoji TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "button_style TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "channel_id TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "message_id TEXT");
+
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panel_categories (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -411,22 +422,39 @@ public class Database {
                 }
 
                 String sql = panelExists
-                        ? "UPDATE ticket_panels SET content = ?, ticket_category_id = ? WHERE id = ?"
-                        : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id) VALUES (?, ?, ?, ?)";
+                        ? "UPDATE ticket_panels SET content = ?, ticket_category_id = ?, embed_title = ?, "
+                                + "embed_colour = ?, image_url = ?, thumbnail_url = ?, footer_text = ?, "
+                                + "button_label = ?, button_emoji = ?, button_style = ?, channel_id = ?, "
+                                + "message_id = ? WHERE id = ?"
+                        : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id, embed_title, "
+                                + "embed_colour, image_url, thumbnail_url, footer_text, button_label, "
+                                + "button_emoji, button_style, channel_id, message_id) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                    int next = 1;
+                    if (!panelExists) {
+                        statement.setString(next++, panel.guildId);
+                        statement.setString(next++, panel.name);
+                    }
+                    statement.setString(next++, panel.content);
+                    statement.setString(next++, panel.ticketCategoryId);
+                    statement.setString(next++, panel.embedTitle);
+                    statement.setString(next++, panel.embedColour);
+                    statement.setString(next++, panel.imageUrl);
+                    statement.setString(next++, panel.thumbnailUrl);
+                    statement.setString(next++, panel.footerText);
+                    statement.setString(next++, panel.buttonLabel);
+                    statement.setString(next++, panel.buttonEmoji);
+                    statement.setString(next++, panel.buttonStyle);
+                    statement.setString(next++, panel.channelId);
+                    statement.setString(next++, panel.messageId);
                     if (panelExists) {
-                        statement.setString(1, panel.content);
-                        statement.setString(2, panel.ticketCategoryId);
-                        statement.setInt(3, panel.id);
-                        statement.executeUpdate();
-                    } else {
-                        statement.setString(1, panel.guildId);
-                        statement.setString(2, panel.name);
-                        statement.setString(3, panel.content);
-                        statement.setString(4, panel.ticketCategoryId);
-                        statement.executeUpdate();
+                        statement.setInt(next, panel.id);
+                    }
+                    statement.executeUpdate();
 
+                    if (!panelExists) {
                         try (ResultSet keys = statement.getGeneratedKeys()) {
                             if (keys.next()) {
                                 panel.id = keys.getInt(1);
@@ -543,6 +571,16 @@ public class Database {
         panelData.name = resultSet.getString("name");
         panelData.content = resultSet.getString("content");
         panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
+        panelData.embedTitle = resultSet.getString("embed_title");
+        panelData.embedColour = resultSet.getString("embed_colour");
+        panelData.imageUrl = resultSet.getString("image_url");
+        panelData.thumbnailUrl = resultSet.getString("thumbnail_url");
+        panelData.footerText = resultSet.getString("footer_text");
+        panelData.buttonLabel = resultSet.getString("button_label");
+        panelData.buttonEmoji = resultSet.getString("button_emoji");
+        panelData.buttonStyle = resultSet.getString("button_style");
+        panelData.channelId = resultSet.getString("channel_id");
+        panelData.messageId = resultSet.getString("message_id");
 
         panelData.categories = loadPanelValues(connection, panelData.id, "ticket_panel_categories", "category_name");
         panelData.staffRoles = loadPanelValues(connection, panelData.id, "ticket_panel_staff_roles", "role_id");
@@ -576,6 +614,29 @@ public class Database {
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next() ? readPanelData(connection, resultSet) : null;
             }
+        }
+    }
+
+    /** Remembers where a panel was published so later edits can update that message. */
+    public static void savePanelMessage(int panelId, String channelId, String messageId) throws SQLException {
+        String sql = "UPDATE ticket_panels SET channel_id = ?, message_id = ? WHERE id = ?";
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, channelId);
+            statement.setString(2, messageId);
+            statement.setInt(3, panelId);
+            statement.executeUpdate();
+        }
+    }
+
+    /** Deletes a panel and (through ON DELETE CASCADE) its categories, roles and questions. */
+    public static boolean deletePanel(String guildId, int panelId) throws SQLException {
+        String sql = "DELETE FROM ticket_panels WHERE guild_id = ? AND id = ?";
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guildId);
+            statement.setInt(2, panelId);
+            return statement.executeUpdate() == 1;
         }
     }
 
