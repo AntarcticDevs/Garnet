@@ -141,6 +141,13 @@ public class TicketPanelEditor extends ListenerAdapter {
             return;
         }
 
+        if (event.getMember() == null || !TicketPermissions.canManagePanels(event.getMember())) {
+            event.reply("You don't have permission to edit ticket panels.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
         try {
             TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
             if (panelData == null) {
@@ -213,7 +220,7 @@ public class TicketPanelEditor extends ListenerAdapter {
             return;
         }
         if (event.getGuild() == null || event.getMember() == null
-                || !event.getMember().hasPermission(net.dv8tion.jda.api.Permission.MANAGE_SERVER)) {
+                || !TicketPermissions.canManagePanels(event.getMember())) {
             event.reply("You don't have permission to edit ticket panels.")
                     .setEphemeral(true)
                     .queue();
@@ -274,6 +281,13 @@ public class TicketPanelEditor extends ListenerAdapter {
 
         if (event.getGuild() == null) {
             event.reply("This editor can only be used inside a server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if (event.getMember() == null || !TicketPermissions.canManagePanels(event.getMember())) {
+            event.reply("You don't have permission to edit ticket panels.")
                     .setEphemeral(true)
                     .queue();
             return;
