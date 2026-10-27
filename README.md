@@ -51,9 +51,9 @@ The project is developed incrementally, with an emphasis on keeping the code cle
 
 ##  Policies
 
-- [Privacy Policy](https://github.com/EnderKnight7op/Ender-Labs/blob/main/PRIVACY.md)
-- [Terms of Service](https://github.com/EnderKnight7op/Ender-Labs/blob/main/TERMS.md)
-- [Security Policy](https://github.com/EnderKnight7op/Ender-Labs/blob/main/SECURITY.md)
+- [Privacy Policy](https://github.com/GarnetDiscordBot/Garnet/blob/main/PRIVACY.md)
+- [Terms of Service](https://github.com/GarnetDiscordBot/Garnet/blob/main/TERMS.md)
+- [Security Policy](https://github.com/GarnetDiscordBot/Garnet/blob/main/SECURITY.md)
 
 ##  Status
 
