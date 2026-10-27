@@ -283,8 +283,13 @@ public class TicketButton extends ListenerAdapter {
                 event.reply("This channel isn't an active ticket.").setEphemeral(true).queue();
                 return;
             }
-            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("You don't have permission to use this control.")
+            TicketPermissions.Action required = TicketPermissions.Action.fromName(action);
+            if (required == null) {
+                event.reply("Unknown ticket control.").setEphemeral(true).queue();
+                return;
+            }
+            if (!TicketPermissions.can(event.getMember(), ticket, required)) {
+                event.reply(TicketPermissions.denialMessage(required))
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -359,22 +364,6 @@ public class TicketButton extends ListenerAdapter {
         }
     }
 
-    private boolean isTicketStaff(Member member, TicketData ticket, String guildId) throws SQLException {
-        if (member.hasPermission(net.dv8tion.jda.api.Permission.MANAGE_CHANNEL)) {
-            return true;
-        }
-        if (ticket.panelId == null) {
-            return false;
-        }
-        TicketPanelData panel = Database.getPanelDataById(guildId, ticket.panelId);
-
-        if (panel == null || panel.staffRoles == null) {
-            return false;
-        }
-        return member.getRoles().stream()
-                .anyMatch(role -> panel.staffRoles.contains(role.getId()));
-    }
-
     private void submitTransfer(ModalInteractionEvent event) {
         if (!(event.getChannel() instanceof TextChannel channel)
                 || event.getMember() == null) {
@@ -394,8 +383,8 @@ public class TicketButton extends ListenerAdapter {
                 return;
             }
 
-            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("You don't have permission to transfer this ticket.")
+            if (!TicketPermissions.can(event.getMember(), ticket, TicketPermissions.Action.TRANSFER)) {
+                event.reply(TicketPermissions.denialMessage(TicketPermissions.Action.TRANSFER))
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -430,7 +419,7 @@ public class TicketButton extends ListenerAdapter {
                 return;
             }
 
-            if (!isTicketStaff(target, ticket, event.getGuild().getId())) {
+            if (!TicketPermissions.isStaff(target, ticket)) {
                 event.reply("The selected member must have a staff role configured for this ticket's panel.")
                         .setEphemeral(true)
                         .queue();
@@ -501,8 +490,8 @@ public class TicketButton extends ListenerAdapter {
                         .queue();
                 return;
             }
-            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("You don't have permission to close this ticket.")
+            if (!TicketPermissions.can(event.getMember(), ticket, TicketPermissions.Action.CLOSE)) {
+                event.reply(TicketPermissions.denialMessage(TicketPermissions.Action.CLOSE))
                         .setEphemeral(true)
                         .queue();
                 return;
@@ -547,8 +536,8 @@ public class TicketButton extends ListenerAdapter {
                         .queue();
                 return;
             }
-            if (!isTicketStaff(event.getMember(), ticket, event.getGuild().getId())) {
-                event.reply("You don't have permission to reopen this ticket.")
+            if (!TicketPermissions.can(event.getMember(), ticket, TicketPermissions.Action.REOPEN)) {
+                event.reply(TicketPermissions.denialMessage(TicketPermissions.Action.REOPEN))
                         .setEphemeral(true)
                         .queue();
                 return;
