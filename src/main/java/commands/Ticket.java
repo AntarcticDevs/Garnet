@@ -208,8 +208,10 @@ public class Ticket extends ListenerAdapter implements Command {
             TicketPanel sender = new TicketPanel();
 
             if (panelOption == null) {
+                TicketPanelData defaultPanel = new TicketPanelData();
+                defaultPanel.name = "Create a ticket";
                 event.deferReply(true).queue(hook ->
-                        sender.panel(null, channel, null).queue(
+                        sender.panel(defaultPanel, channel).queue(
                                 message -> hook.sendMessage("Default ticket panel sent to " + channel.getAsMention() + ".").queue(),
                                 error -> hook.sendMessage("Couldn't send the ticket panel. Check that I can view and send messages in that channel.")
                                         .queue()
@@ -231,8 +233,15 @@ public class Ticket extends ListenerAdapter implements Command {
                 }
 
                 event.deferReply(true).queue(hook ->
-                        sender.panel(panelData, channel).queue(
-                                message -> hook.sendMessage("Ticket panel **" + panelData.name + "** sent to " + channel.getAsMention() + ".").queue(),
+                        sender.publish(panelData, channel).queue(
+                                message -> {
+                                    try {
+                                        Database.savePanelMessage(panelData.id, channel.getId(), message.getId());
+                                    } catch (SQLException exception) {
+                                        exception.printStackTrace();
+                                    }
+                                    hook.sendMessage("Ticket panel **" + panelData.name + "** sent to " + channel.getAsMention() + ".").queue();
+                                },
                                 error -> hook.sendMessage("Couldn't send the ticket panel. Check that I can view and send messages in that channel.")
                                         .queue()
                         )
@@ -300,11 +309,7 @@ public class Ticket extends ListenerAdapter implements Command {
                             .queue();
                     return;
                 }
-                new TicketPanelEditor().openRoleSelector(
-                        event,
-                        panelData,
-                        "staff-roles".equals(event.getSubcommandName())
-                );
+                new TicketPanelEditor().open(event, panelData, TicketPanelEditor.Page.ROUTING);
             } catch (SQLException exception) {
                 exception.printStackTrace();
                 event.reply("Couldn't load the ticket panel settings. Please try again.")

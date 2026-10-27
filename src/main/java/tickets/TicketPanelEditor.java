@@ -1,385 +1,767 @@
 package tickets;
 
-import net.dv8tion.jda.api.components.container.Container;
-import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
+import database.Database;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.container.Container;
+import net.dv8tion.jda.api.components.container.ContainerChildComponent;
+import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.section.Section;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
+import net.dv8tion.jda.api.components.selections.SelectOption;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.separator.Separator;
+import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.IMentionable;
+import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
+import net.dv8tion.jda.api.entities.channel.concrete.Category;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
-import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import database.Database;
-import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.interactions.callbacks.IMessageEditCallback;
+import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
+import net.dv8tion.jda.api.modals.Modal;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageEditData;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
+import java.util.Locale;
 import java.util.regex.Pattern;
-import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
-import net.dv8tion.jda.api.components.separator.Separator;
 
-import net.dv8tion.jda.api.components.label.Label;
-import net.dv8tion.jda.api.components.textinput.TextInput;
-import net.dv8tion.jda.api.components.textinput.TextInputStyle;
-
-import net.dv8tion.jda.api.modals.Modal;
-
-
-
+/**
+ * The ticket panel editor: one ephemeral Components V2 message that updates in place.
+ *
+ * <p>Every component ID has the form {@code pe:<panelId>:<page>:<action>[:<arg>]} so a click can
+ * be handled without keeping any state in memory. All changes are saved immediately; the
+ * published panel message only changes when the user presses Publish.
+ */
 public class TicketPanelEditor extends ListenerAdapter {
 
-    public void openRoleSelector(
-            SlashCommandInteractionEvent event,
-            TicketPanelData panelData,
-            boolean staffRoles
-    ) {
-        List<String> selectedRoleIds = staffRoles ? panelData.staffRoles : panelData.pingRoles;
-        List<EntitySelectMenu.DefaultValue> defaults = selectedRoleIds.stream()
-                .map(event.getGuild()::getRoleById)
-                .filter(java.util.Objects::nonNull)
-                .map(EntitySelectMenu.DefaultValue::from)
-                .toList();
-        String roleType = staffRoles ? "staff" : "ping";
-        EntitySelectMenu.Builder selector = EntitySelectMenu.create(
-                        "panel_roles:" + roleType + ":" + panelData.id,
-                        EntitySelectMenu.SelectTarget.ROLE
-                )
-                .setPlaceholder(staffRoles ? "Select staff roles" : "Select ping roles")
-                .setRequiredRange(0, 25);
-        if (!defaults.isEmpty()) {
-            selector.setDefaultValues(defaults);
+    private static final String PREFIX = "pe:";
+    private static final Pattern HEX_COLOUR = Pattern.compile("^#?[0-9a-fA-F]{6}$");
+    private static final Pattern HTTP_URL = Pattern.compile("^https?://\\S+$", Pattern.CASE_INSENSITIVE);
+
+    public enum Page {
+        APPEARANCE("appearance", "Appearance", "Title, colour, images and the button"),
+        ROUTING("routing", "Roles & routing", "Staff and ping roles, channels"),
+        CATEGORIES("categories", "Categories", "Dropdown categories and their questions");
+
+        final String key;
+        final String label;
+        final String description;
+
+        Page(String key, String label, String description) {
+            this.key = key;
+            this.label = label;
+            this.description = description;
         }
-        event.reply("Choose up to 25 roles. Your selection replaces the panel's current "
-                        + (staffRoles ? "staff-role" : "ping-role") + " list.")
-                .addComponents(ActionRow.of(selector.build()))
+
+        static Page fromKey(String key) {
+            for (Page page : values()) {
+                if (page.key.equals(key)) {
+                    return page;
+                }
+            }
+            return APPEARANCE;
+        }
+    }
+
+    private record Ctx(TicketPanelData panel, Page page, String action, String arg) {
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Entry points (called from /ticket panel ...)
+    // ---------------------------------------------------------------------------------------
+
+    public void open(SlashCommandInteractionEvent event, TicketPanelData panelData) {
+        open(event, panelData, Page.APPEARANCE);
+    }
+
+    public void open(SlashCommandInteractionEvent event, TicketPanelData panelData, Page page) {
+        Container container = render(panelData, page, event.getGuild(), null);
+        event.reply(new MessageCreateBuilder().useComponentsV2().addComponents(container).build())
                 .setEphemeral(true)
                 .queue();
     }
 
-    public void open(SlashCommandInteractionEvent event, TicketPanelData panelData) {
-        TextDisplay title = TextDisplay.of("# TicketPanelEditor");
-        TextDisplay subTitle = TextDisplay.of("## Editing: " + panelData.name);
-        TextDisplay description = TextDisplay.of("**Configure how this ticket panel works.**");
+    // ---------------------------------------------------------------------------------------
+    // Rendering
+    // ---------------------------------------------------------------------------------------
 
-        TextDisplay categoryTotal = TextDisplay.of("**Categories: " + panelData.categories.size() + "**");
-        TextDisplay staffRolesTotal = TextDisplay.of("**Staff Roles: " + panelData.staffRoles.size() + "**");
-        TextDisplay pingRolesTotal = TextDisplay.of("**Ping Roles: " + panelData.pingRoles.size() + "**");
-        TextDisplay ticketCategory = TextDisplay.of(panelData.ticketCategoryId == null
-            ? "**Ticket Category: Not set**"
-            : "**Ticket Category: <#" + panelData.ticketCategoryId + ">" + "**");
-
-        Button button1 = Button.primary("panel_edit:content:" + panelData.id, "Content");
-        Button button2 = Button.primary("panel_edit:categories:" + panelData.id, "Categories");
-        Button button3 = Button.primary("panel_edit:staff_roles:" + panelData.id, "Staff Roles");
-        Button button4 = Button.primary("panel_edit:ping_roles:" + panelData.id, "Ping Roles");
-        Button button5 = Button.primary("panel_edit:ticket_category:" + panelData.id, "Ticket Category");
-        Button button6 = Button.primary("panel_edit:category_questions:" + panelData.id, "Category Questions");
-        Container container = Container.of(
-            title,
-            subTitle,
-            description,
-            Separator.createDivider(Separator.Spacing.LARGE),
-            categoryTotal,
-            staffRolesTotal,
-            pingRolesTotal,
-            ticketCategory,
-            Separator.createDivider(Separator.Spacing.LARGE),
-            TextDisplay.of("## Edit:"),
-            ActionRow.of(button1, button2, button3),
-            ActionRow.of(button4, button5, button6),
-            Separator.createDivider(Separator.Spacing.LARGE),
-            TextDisplay.of("-# © 2026 Garnet • All rights reserved.")
-        );
-
-        MessageCreateBuilder message = new MessageCreateBuilder()
-            .useComponentsV2()
-            .addComponents(container);
-
-        event.reply(message.build()).setEphemeral(true).queue();
+    private static String id(TicketPanelData panel, Page page, String action) {
+        return PREFIX + panel.id + ":" + page.key + ":" + action;
     }
 
+    private static String id(TicketPanelData panel, Page page, String action, String arg) {
+        return id(panel, page, action) + ":" + arg;
+    }
+
+    private MessageEditData view(TicketPanelData panel, Page page, Guild guild, String notice) {
+        return new MessageEditBuilder().useComponentsV2().setComponents(render(panel, page, guild, notice)).build();
+    }
+
+    private MessageEditData plainView(String text) {
+        return new MessageEditBuilder()
+                .useComponentsV2()
+                .setComponents(Container.of(TextDisplay.of(text)))
+                .build();
+    }
+
+    private Container render(TicketPanelData panel, Page page, Guild guild, String notice) {
+        List<ContainerChildComponent> children = new ArrayList<>();
+        children.add(TextDisplay.of("# Panel editor: " + truncate(panel.name, 60)));
+        children.add(TextDisplay.of(statusLine(panel)));
+        if (notice != null) {
+            children.add(TextDisplay.of(notice));
+        }
+        children.add(Separator.createDivider(Separator.Spacing.SMALL));
+
+        switch (page) {
+            case APPEARANCE -> addAppearance(children, panel, page);
+            case ROUTING -> addRouting(children, panel, page, guild);
+            case CATEGORIES -> addCategories(children, panel, page);
+        }
+
+        children.add(Separator.createDivider(Separator.Spacing.SMALL));
+        children.add(ActionRow.of(pageMenu(panel, page)));
+        children.add(ActionRow.of(
+                Button.secondary(id(panel, page, "preview"), "Preview"),
+                Button.success(id(panel, page, "publish"), panel.messageId == null ? "Publish" : "Update panel"),
+                Button.danger(id(panel, page, "delete"), "Delete"),
+                Button.secondary(id(panel, page, "done"), "Done")));
+        return Container.of(children).withAccentColor(TicketPanel.parseColour(panel.embedColour));
+    }
+
+    private String statusLine(TicketPanelData panel) {
+        String where = panel.channelId == null
+                ? "Not published yet."
+                : (panel.messageId == null ? "Channel set: <#" + panel.channelId + ">. Not published yet."
+                        : "Published in <#" + panel.channelId + ">.");
+        return "-# " + where + " Changes save automatically; press **"
+                + (panel.messageId == null ? "Publish" : "Update panel") + "** to show them to members.";
+    }
+
+    private StringSelectMenu pageMenu(TicketPanelData panel, Page current) {
+        StringSelectMenu.Builder menu = StringSelectMenu.create(id(panel, current, "nav"))
+                .setPlaceholder("Go to a page");
+        for (Page page : Page.values()) {
+            menu.addOptions(SelectOption.of(page.label, page.key).withDescription(page.description));
+        }
+        menu.setDefaultValues(current.key);
+        return menu.build();
+    }
+
+    private void addAppearance(List<ContainerChildComponent> children, TicketPanelData panel, Page page) {
+        String title = orDefault(panel.embedTitle, "*default (panel name)*");
+        String description = panel.content == null || panel.content.isBlank()
+                ? "*default text*"
+                : truncate(panel.content.replace('\n', ' '), 90);
+        children.add(row(id(panel, page, "title"),
+                "**Title & description**\nTitle: " + truncate(title, 70) + "\nDescription: " + description));
+
+        String colour = panel.embedColour == null ? "#5865F2 *(default)*" : normaliseColour(panel.embedColour);
+        children.add(row(id(panel, page, "colour"), "**Colour**\n" + colour));
+
+        children.add(row(id(panel, page, "images"),
+                "**Images**\nImage: " + (panel.imageUrl == null ? "*not set*" : "set")
+                        + "\nThumbnail: " + (panel.thumbnailUrl == null ? "*not set*" : "set")));
+
+        children.add(row(id(panel, page, "footer"),
+                "**Footer**\n" + (panel.footerText == null
+                        ? "*default (server name)*"
+                        : truncate(panel.footerText, 80))));
+
+        String emoji = panel.buttonEmoji == null ? "" : panel.buttonEmoji + " ";
+        String label = orDefault(panel.buttonLabel, TicketPanelData.DEFAULT_BUTTON_LABEL);
+        children.add(row(id(panel, page, "button"),
+                "**Create button**\n" + emoji + truncate(label, 40) + " · " + styleName(panel.buttonStyle)
+                        + (panel.categories.isEmpty() ? "" : "\n-# Not shown while the panel has categories; "
+                                + "members use the dropdown instead.")));
+    }
+
+    private void addRouting(List<ContainerChildComponent> children, TicketPanelData panel, Page page, Guild guild) {
+        children.add(TextDisplay.of("**Staff roles**\n" + mentionList(panel.staffRoles, "@&", guild, true)
+                + "\n-# Can claim, close and manage tickets from this panel."));
+        children.add(ActionRow.of(roleMenu(panel, page, "staff", "Select staff roles", panel.staffRoles, guild)));
+
+        children.add(TextDisplay.of("**Ping roles**\n" + mentionList(panel.pingRoles, "@&", guild, true)
+                + "\n-# Mentioned when a ticket is opened."));
+        children.add(ActionRow.of(roleMenu(panel, page, "ping", "Select ping roles", panel.pingRoles, guild)));
+
+        children.add(TextDisplay.of("**Ticket category**\n"
+                + (panel.ticketCategoryId == null ? "*server default (/ticket set-category)*"
+                        : "<#" + panel.ticketCategoryId + ">")
+                + "\n-# Discord category new ticket channels are created in."));
+        EntitySelectMenu.Builder category = EntitySelectMenu.create(
+                        id(panel, page, "ticketcat"), EntitySelectMenu.SelectTarget.CHANNEL)
+                .setChannelTypes(ChannelType.CATEGORY)
+                .setPlaceholder("Select a ticket category")
+                .setRequiredRange(0, 1);
+        if (panel.ticketCategoryId != null && guild.getCategoryById(panel.ticketCategoryId) != null) {
+            category.setDefaultValues(EntitySelectMenu.DefaultValue.channel(panel.ticketCategoryId));
+        }
+        children.add(ActionRow.of(category.build()));
+
+        children.add(TextDisplay.of("**Panel channel**\n"
+                + (panel.channelId == null ? "*not set*" : "<#" + panel.channelId + ">")
+                + "\n-# Where the panel is published."));
+        EntitySelectMenu.Builder channel = EntitySelectMenu.create(
+                        id(panel, page, "channel"), EntitySelectMenu.SelectTarget.CHANNEL)
+                .setChannelTypes(ChannelType.TEXT)
+                .setPlaceholder("Select the panel channel")
+                .setRequiredRange(0, 1);
+        if (panel.channelId != null && guild.getTextChannelById(panel.channelId) != null) {
+            channel.setDefaultValues(EntitySelectMenu.DefaultValue.channel(panel.channelId));
+        }
+        children.add(ActionRow.of(channel.build()));
+    }
+
+    private EntitySelectMenu roleMenu(
+            TicketPanelData panel, Page page, String kind, String placeholder, List<String> selected, Guild guild) {
+        EntitySelectMenu.Builder menu = EntitySelectMenu.create(
+                        id(panel, page, kind), EntitySelectMenu.SelectTarget.ROLE)
+                .setPlaceholder(placeholder)
+                .setRequiredRange(0, 25);
+        List<EntitySelectMenu.DefaultValue> defaults = selected.stream()
+                .filter(roleId -> guild.getRoleById(roleId) != null)
+                .map(EntitySelectMenu.DefaultValue::role)
+                .toList();
+        if (!defaults.isEmpty()) {
+            menu.setDefaultValues(defaults);
+        }
+        return menu.build();
+    }
+
+    private void addCategories(List<ContainerChildComponent> children, TicketPanelData panel, Page page) {
+        StringBuilder text = new StringBuilder("**Categories**\n");
+        if (panel.categories.isEmpty()) {
+            text.append("*none: members see a single create button*");
+        } else {
+            for (int index = 0; index < panel.categories.size(); index++) {
+                String category = panel.categories.get(index);
+                int count = questionCount(panel, category);
+                text.append(index + 1).append(". ").append(truncate(category, 60))
+                        .append(count == 0 ? "" : " · " + count + (count == 1 ? " question" : " questions"))
+                        .append('\n');
+            }
+        }
+        text.append("\n-# Members pick a category from a dropdown. Renaming a category removes its questions.");
+        children.add(row(id(panel, page, "categories"), text.toString()));
+
+        if (!panel.categories.isEmpty()) {
+            StringSelectMenu.Builder menu = StringSelectMenu.create(id(panel, page, "qpick"))
+                    .setPlaceholder("Edit the questions for a category");
+            for (int index = 0; index < panel.categories.size() && index < 25; index++) {
+                menu.addOptions(SelectOption.of(truncate(panel.categories.get(index), 100), Integer.toString(index)));
+            }
+            children.add(ActionRow.of(menu.build()));
+        }
+    }
+
+    private int questionCount(TicketPanelData panel, String category) {
+        try {
+            return Database.getPanelQuestions(panel.id, category).size();
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            return 0;
+        }
+    }
+
+    private static Section row(String buttonId, String text) {
+        return Section.of(Button.secondary(buttonId, "Edit"), TextDisplay.of(text));
+    }
+
+    private static String mentionList(List<String> ids, String prefix, Guild guild, boolean roles) {
+        List<String> valid = ids.stream()
+                .filter(value -> roles ? guild.getRoleById(value) != null : guild.getGuildChannelById(value) != null)
+                .toList();
+        if (valid.isEmpty()) {
+            return "*none*";
+        }
+        return truncate(String.join(" ", valid.stream().map(value -> "<" + prefix + value + ">").toList()), 600);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Interaction plumbing
+    // ---------------------------------------------------------------------------------------
+
+    /** Validates the click and loads the panel; replies with an error and returns null on failure. */
+    private Ctx resolve(IReplyCallback event, String customId) {
+        Guild guild = event.getGuild();
+        Member member = event.getMember();
+        if (guild == null || member == null) {
+            deny(event, "This editor can only be used inside a server.");
+            return null;
+        }
+        if (!TicketPermissions.canManagePanels(member)) {
+            deny(event, "You don't have permission to edit ticket panels.");
+            return null;
+        }
+        String[] parts = customId.split(":", 5);
+        if (parts.length < 4) {
+            deny(event, "That editor control is invalid. Reopen the editor with /ticket panel edit.");
+            return null;
+        }
+        try {
+            int panelId = Integer.parseInt(parts[1]);
+            TicketPanelData panel = Database.getPanelDataById(guild.getId(), panelId);
+            if (panel == null) {
+                deny(event, "That ticket panel no longer exists.");
+                return null;
+            }
+            return new Ctx(panel, Page.fromKey(parts[2]), parts[3], parts.length > 4 ? parts[4] : null);
+        } catch (NumberFormatException exception) {
+            deny(event, "Invalid ticket panel ID.");
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            deny(event, "Couldn't load the ticket panel. Please try again.");
+        }
+        return null;
+    }
+
+    private static void deny(IReplyCallback event, String message) {
+        event.reply(message).setEphemeral(true).queue();
+    }
+
+    private void refresh(IMessageEditCallback event, TicketPanelData panel, Page page, String notice) {
+        event.editMessage(view(panel, page, event.getGuild(), notice)).queue();
+    }
+
+    private <E extends IMessageEditCallback & IReplyCallback> void saveAndRefresh(E event, Ctx ctx, String notice) {
+        try {
+            Database.savePanel(ctx.panel());
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            deny(event, "Couldn't save that change. Please try again.");
+            return;
+        }
+        refresh(event, ctx.panel(), ctx.page(), notice);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Buttons
+    // ---------------------------------------------------------------------------------------
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
-        if (!event.getButton().getCustomId().startsWith("panel_edit:")) {
+        if (!event.getComponentId().startsWith(PREFIX)) {
+            return;
+        }
+        Ctx ctx = resolve(event, event.getComponentId());
+        if (ctx == null) {
+            return;
+        }
+        TicketPanelData panel = ctx.panel();
+        Page page = ctx.page();
+
+        switch (ctx.action()) {
+            case "title" -> event.replyModal(Modal.create(id(panel, page, "title"), "Title & description")
+                    .addComponents(
+                            Label.of("Title", input("title", TextInputStyle.SHORT, 256, panel.embedTitle,
+                                    "Leave blank to use the panel name: " + truncate(panel.name, 40), false)),
+                            Label.of("Description", input("description", TextInputStyle.PARAGRAPH, 2000,
+                                    panel.content, "Shown above the create button", false)))
+                    .build()).queue();
+            case "colour" -> event.replyModal(Modal.create(id(panel, page, "colour"), "Colour")
+                    .addComponents(Label.of("Hex colour", input("colour", TextInputStyle.SHORT, 7,
+                            panel.embedColour, "#5865F2 (leave blank for the default)", false)))
+                    .build()).queue();
+            case "images" -> event.replyModal(Modal.create(id(panel, page, "images"), "Images")
+                    .addComponents(
+                            Label.of("Image URL", input("image", TextInputStyle.SHORT, 500, panel.imageUrl,
+                                    "Large image under the description (https://...)", false)),
+                            Label.of("Thumbnail URL", input("thumbnail", TextInputStyle.SHORT, 500,
+                                    panel.thumbnailUrl, "Small image in the corner (https://...)", false)))
+                    .build()).queue();
+            case "footer" -> event.replyModal(Modal.create(id(panel, page, "footer"), "Footer")
+                    .addComponents(Label.of("Footer text", input("footer", TextInputStyle.SHORT, 200,
+                            panel.footerText, "Leave blank to show the server name", false)))
+                    .build()).queue();
+            case "button" -> event.replyModal(Modal.create(id(panel, page, "button"), "Create button")
+                    .addComponents(
+                            Label.of("Label", input("label", TextInputStyle.SHORT, 80, panel.buttonLabel,
+                                    TicketPanelData.DEFAULT_BUTTON_LABEL, false)),
+                            Label.of("Emoji", input("emoji", TextInputStyle.SHORT, 80, panel.buttonEmoji,
+                                    "🎫 or a server emoji like <:name:id>", false)),
+                            Label.of("Colour", input("style", TextInputStyle.SHORT, 10,
+                                    panel.buttonStyle == null ? null : styleName(panel.buttonStyle),
+                                    "Blue, Grey, Green or Red", false)))
+                    .build()).queue();
+            case "categories" -> event.replyModal(Modal.create(id(panel, page, "categories"), "Categories")
+                    .addComponents(Label.of("Categories (one per line, up to 25)",
+                            input("categories", TextInputStyle.PARAGRAPH, 2500,
+                                    String.join("\n", panel.categories), "Billing\nSupport\nReport a user", false)))
+                    .build()).queue();
+            case "preview" -> preview(event, panel);
+            case "publish" -> publish(event, ctx);
+            case "delete" -> event.editMessage(deleteConfirmation(panel, page)).queue();
+            case "delete_cancel" -> refresh(event, panel, page, null);
+            case "delete_confirm" -> deletePanel(event, ctx);
+            case "done" -> event.editMessage(plainView(
+                    "**Editor closed.** Your changes are saved. Reopen it any time with `/ticket panel edit`."))
+                    .queue();
+            default -> deny(event, "That editor control isn't available.");
+        }
+    }
+
+    private void preview(ButtonInteractionEvent event, TicketPanelData panel) {
+        TicketPanel renderer = new TicketPanel();
+        event.reply("**Preview.** This is how members will see the panel (the controls are disabled here).")
+                .addEmbeds(renderer.buildEmbed(panel, event.getGuild()))
+                .addComponents(renderer.buildActionRow(panel).withDisabled(true))
+                .setEphemeral(true)
+                .queue();
+    }
+
+    private void publish(ButtonInteractionEvent event, Ctx ctx) {
+        TicketPanelData panel = ctx.panel();
+        Guild guild = event.getGuild();
+        TextChannel channel = panel.channelId == null ? null : guild.getTextChannelById(panel.channelId);
+        if (channel == null) {
+            refresh(event, panel, ctx.page(), "⚠️ Select a panel channel on the **Roles & routing** page first.");
             return;
         }
 
-        String[] parts = event.getButton().getCustomId().split(":");
+        event.deferEdit().queue(hook -> new TicketPanel().publish(panel, channel).queue(
+                message -> {
+                    try {
+                        Database.savePanelMessage(panel.id, channel.getId(), message.getId());
+                        panel.channelId = channel.getId();
+                        panel.messageId = message.getId();
+                    } catch (SQLException exception) {
+                        exception.printStackTrace();
+                        hook.editOriginal(view(panel, ctx.page(), guild,
+                                "⚠️ The panel was sent but I couldn't remember its message, so it can't be updated in place."))
+                                .queue();
+                        return;
+                    }
+                    hook.editOriginal(view(panel, ctx.page(), guild,
+                            "✅ Published in " + channel.getAsMention() + ".")).queue();
+                },
+                error -> hook.editOriginal(view(panel, ctx.page(), guild,
+                        "⚠️ I couldn't publish the panel. Check that I can view, send messages and embed links in "
+                                + channel.getAsMention() + ".")).queue()));
+    }
 
-        if (parts.length != 3) {
-            return;
-        }
+    private MessageEditData deleteConfirmation(TicketPanelData panel, Page page) {
+        Container container = Container.of(
+                TextDisplay.of("## Delete **" + truncate(panel.name, 60) + "**?"),
+                TextDisplay.of("This permanently deletes the panel with its categories, questions and roles, "
+                        + "and removes the published panel message.\n"
+                        + "Tickets that are already open keep working, but only members with Manage Channels or "
+                        + "Manage Server can manage them afterwards."),
+                ActionRow.of(
+                        Button.danger(id(panel, page, "delete_confirm"), "Delete panel"),
+                        Button.secondary(id(panel, page, "delete_cancel"), "Cancel")));
+        return new MessageEditBuilder().useComponentsV2().setComponents(container).build();
+    }
 
-        String action = parts[1];
-        int panelId;
+    private void deletePanel(ButtonInteractionEvent event, Ctx ctx) {
+        TicketPanelData panel = ctx.panel();
+        Guild guild = event.getGuild();
         try {
-            panelId = Integer.parseInt(parts[2]);
-        } catch (NumberFormatException exception) {
-            event.reply("Invalid ticket panel ID.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-        if (!Set.of("content", "categories", "staff_roles", "ping_roles", "ticket_category",
-                "category_questions").contains(action)) {
-            event.reply("That ticket panel setting isn't available.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        if (event.getGuild() == null) {
-            event.reply("This editor can only be used inside a server.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        if (event.getMember() == null || !TicketPermissions.canManagePanels(event.getMember())) {
-            event.reply("You don't have permission to edit ticket panels.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
-
-        try {
-            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
-            if (panelData == null) {
-                event.reply("That ticket panel no longer exists.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
-            }
-
-            if ("category_questions".equals(action)) {
-                TextInput categoryInput = TextInput.create("category", TextInputStyle.SHORT)
-                        .setRequired(true)
-                        .setPlaceholder("Exact category name from the Categories setting")
-                        .build();
-                TextInput questionsInput = TextInput.create("questions", TextInputStyle.PARAGRAPH)
-                        .setRequired(false)
-                        .setPlaceholder("One prompt per line (up to 5; leave blank to remove)")
-                        .build();
-                Modal modal = Modal.create("panel_edit:category_questions:" + panelId, "Category Questions")
-                        .addComponents(Label.of("Ticket Category", categoryInput),
-                                Label.of("Questions", questionsInput))
-                        .build();
-                event.replyModal(modal).queue();
-                return;
-            }
-
-            TextInput.Builder contentBuilder = TextInput.create("value", TextInputStyle.PARAGRAPH)
-                    .setRequired(false);
-            String currentValue = switch (action) {
-                case "content" -> panelData.content;
-                case "categories" -> String.join(", ", panelData.categories);
-                case "staff_roles" -> formatMentions(panelData.staffRoles, "role");
-                case "ping_roles" -> formatMentions(panelData.pingRoles, "role");
-                case "ticket_category" -> panelData.ticketCategoryId == null
-                        ? ""
-                        : "<#" + panelData.ticketCategoryId + ">";
-                default -> "";
-            };
-            if (currentValue != null && !currentValue.isBlank()) {
-                contentBuilder.setValue(currentValue);
-            }
-            TextInput content = contentBuilder.build();
-            String label = switch (action) {
-                case "content" -> "Panel Content";
-                case "categories" -> "Categories (comma-separated)";
-                case "staff_roles" -> "Staff Roles (mentions or IDs)";
-                case "ping_roles" -> "Ping Roles (mentions or IDs)";
-                case "ticket_category" -> "Ticket Channel Category (mention or ID)";
-                default -> "Panel Setting";
-            };
-            Label contentLabel = Label.of(label, content);
-
-            Modal modal = Modal.create("panel_edit:" + action + ":" + panelId, "Edit " + label)
-                    .addComponents(contentLabel)
-                    .build();
-            event.replyModal(modal).queue();
+            Database.deletePanel(guild.getId(), panel.id);
         } catch (SQLException exception) {
             exception.printStackTrace();
-            event.reply("Couldn't load the panel content. Please try again.")
-                    .setEphemeral(true)
-                    .queue();
+            refresh(event, panel, ctx.page(), "⚠️ Couldn't delete the panel. Please try again.");
+            return;
+        }
+        if (panel.channelId != null && panel.messageId != null) {
+            TextChannel channel = guild.getTextChannelById(panel.channelId);
+            if (channel != null) {
+                channel.deleteMessageById(panel.messageId).queue(null, error -> { });
+            }
+        }
+        event.editMessage(plainView("**Deleted** the panel `" + truncate(panel.name, 60) + "`.")).queue();
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Select menus
+    // ---------------------------------------------------------------------------------------
+
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        if (!event.getComponentId().startsWith(PREFIX) || event.getValues().isEmpty()) {
+            return;
+        }
+        Ctx ctx = resolve(event, event.getComponentId());
+        if (ctx == null) {
+            return;
+        }
+        String value = event.getValues().get(0);
+        switch (ctx.action()) {
+            case "nav" -> refresh(event, ctx.panel(), Page.fromKey(value), null);
+            case "qpick" -> {
+                int index;
+                try {
+                    index = Integer.parseInt(value);
+                } catch (NumberFormatException exception) {
+                    deny(event, "That category isn't available.");
+                    return;
+                }
+                if (index < 0 || index >= ctx.panel().categories.size()) {
+                    deny(event, "That category no longer exists. Reopen the editor and try again.");
+                    return;
+                }
+                String category = ctx.panel().categories.get(index);
+                List<String> questions;
+                try {
+                    questions = Database.getPanelQuestions(ctx.panel().id, category);
+                } catch (SQLException exception) {
+                    exception.printStackTrace();
+                    deny(event, "Couldn't load that category's questions. Please try again.");
+                    return;
+                }
+                event.replyModal(Modal.create(id(ctx.panel(), ctx.page(), "questions", Integer.toString(index)),
+                                "Questions: " + truncate(category, 30))
+                        .addComponents(Label.of("Questions (one per line, up to 5)",
+                                input("questions", TextInputStyle.PARAGRAPH, 400, String.join("\n", questions),
+                                        "What is your order number?\nWhat happened?", false)))
+                        .build()).queue();
+            }
+            default -> deny(event, "That editor control isn't available.");
         }
     }
 
     @Override
     public void onEntitySelectInteraction(EntitySelectInteractionEvent event) {
-        String[] parts = event.getComponentId().split(":");
-        if (parts.length != 3 || !"panel_roles".equals(parts[0])
-                || !Set.of("staff", "ping").contains(parts[1])) {
+        if (!event.getComponentId().startsWith(PREFIX)) {
             return;
         }
-        if (event.getGuild() == null || event.getMember() == null
-                || !TicketPermissions.canManagePanels(event.getMember())) {
-            event.reply("You don't have permission to edit ticket panels.")
-                    .setEphemeral(true)
-                    .queue();
+        Ctx ctx = resolve(event, event.getComponentId());
+        if (ctx == null) {
             return;
         }
+        TicketPanelData panel = ctx.panel();
+        List<IMentionable> values = new ArrayList<>(event.getValues());
 
-        try {
-            int panelId = Integer.parseInt(parts[2]);
-            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
-            if (panelData == null) {
-                event.reply("That ticket panel no longer exists.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
+        switch (ctx.action()) {
+            case "staff", "ping" -> {
+                List<String> roleIds = values.stream()
+                        .filter(Role.class::isInstance)
+                        .map(Role.class::cast)
+                        .filter(role -> !role.isPublicRole())
+                        .map(Role::getId)
+                        .distinct()
+                        .toList();
+                if ("staff".equals(ctx.action())) {
+                    panel.staffRoles = new ArrayList<>(roleIds);
+                } else {
+                    panel.pingRoles = new ArrayList<>(roleIds);
+                }
+                saveAndRefresh(event, ctx, "✅ Saved.");
             }
-            List<String> roleIds = event.getValues().stream()
-                    .filter(Role.class::isInstance)
-                    .map(Role.class::cast)
-                    .filter(role -> !role.isPublicRole())
-                    .map(Role::getId)
-                    .distinct()
-                    .toList();
-            if (roleIds.size() > 25) {
-                event.reply("Select no more than 25 roles.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
+            case "ticketcat" -> {
+                panel.ticketCategoryId = values.stream()
+                        .filter(Category.class::isInstance)
+                        .map(Category.class::cast)
+                        .map(Category::getId)
+                        .findFirst()
+                        .orElse(null);
+                saveAndRefresh(event, ctx, "✅ Saved.");
             }
-            if ("staff".equals(parts[1])) {
-                panelData.staffRoles = new ArrayList<>(roleIds);
-            } else {
-                panelData.pingRoles = new ArrayList<>(roleIds);
+            case "channel" -> {
+                String newChannelId = values.stream()
+                        .filter(TextChannel.class::isInstance)
+                        .map(TextChannel.class::cast)
+                        .map(TextChannel::getId)
+                        .findFirst()
+                        .orElse(null);
+                boolean moved = panel.messageId != null && !java.util.Objects.equals(newChannelId, panel.channelId);
+                if (moved) {
+                    // Moving the panel removes the old message; Publish posts it in the new channel.
+                    TextChannel old = panel.channelId == null ? null : event.getGuild().getTextChannelById(panel.channelId);
+                    if (old != null) {
+                        old.deleteMessageById(panel.messageId).queue(null, error -> { });
+                    }
+                    panel.messageId = null;
+                }
+                panel.channelId = newChannelId;
+                saveAndRefresh(event, ctx, moved
+                        ? "✅ Saved. The old panel message was removed. Press **Publish** to post it here."
+                        : "✅ Saved.");
             }
-            Database.savePanel(panelData);
-            event.reply("Saved " + roleIds.size() + " "
-                            + ("staff".equals(parts[1]) ? "staff" : "ping")
-                            + " role(s) for **" + panelData.name + "**.")
-                    .setEphemeral(true)
-                    .queue();
-        } catch (NumberFormatException exception) {
-            event.reply("Invalid ticket panel ID.")
-                    .setEphemeral(true)
-                    .queue();
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-            event.reply("Couldn't save the selected roles. Please try again.")
-                    .setEphemeral(true)
-                    .queue();
+            default -> deny(event, "That editor control isn't available.");
         }
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Modals
+    // ---------------------------------------------------------------------------------------
 
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
-        String customId = event.getModalId();
-        if (!customId.startsWith("panel_edit:")) {
+        if (!event.getModalId().startsWith(PREFIX)) {
             return;
         }
-
-        if (event.getGuild() == null) {
-            event.reply("This editor can only be used inside a server.")
-                    .setEphemeral(true)
-                    .queue();
+        Ctx ctx = resolve(event, event.getModalId());
+        if (ctx == null) {
             return;
         }
-
-        if (event.getMember() == null || !TicketPermissions.canManagePanels(event.getMember())) {
-            event.reply("You don't have permission to edit ticket panels.")
-                    .setEphemeral(true)
-                    .queue();
-            return;
-        }
+        TicketPanelData panel = ctx.panel();
 
         try {
-            String[] parts = customId.split(":");
-            if (parts.length != 3) {
-                event.reply("Invalid ticket panel setting.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
-            }
-            String action = parts[1];
-            int panelId = Integer.parseInt(parts[2]);
-            TicketPanelData panelData = Database.getPanelDataById(event.getGuild().getId(), panelId);
-            if (panelData == null) {
-                event.reply("That ticket panel no longer exists.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
-            }
-
-            if ("category_questions".equals(parts[1])) {
-                String categoryName = event.getValue("category").getAsString().trim();
-                if (!panelData.categories.contains(categoryName)) {
-                    event.reply("Add that exact category to the panel before configuring its questions.")
-                            .setEphemeral(true)
-                            .queue();
+            switch (ctx.action()) {
+                case "title" -> {
+                    panel.embedTitle = blankToNull(value(event, "title"));
+                    panel.content = blankToNull(value(event, "description"));
+                }
+                case "colour" -> {
+                    String colour = value(event, "colour");
+                    if (!colour.isEmpty() && !HEX_COLOUR.matcher(colour).matches()) {
+                        throw new IllegalArgumentException("Use a hex colour like `#5865F2`.");
+                    }
+                    panel.embedColour = colour.isEmpty() ? null : normaliseColour(colour);
+                }
+                case "images" -> {
+                    panel.imageUrl = validUrl(value(event, "image"), "Image");
+                    panel.thumbnailUrl = validUrl(value(event, "thumbnail"), "Thumbnail");
+                }
+                case "footer" -> panel.footerText = blankToNull(value(event, "footer"));
+                case "button" -> {
+                    panel.buttonLabel = blankToNull(value(event, "label"));
+                    String emoji = value(event, "emoji");
+                    if (!emoji.isEmpty() && TicketPanel.parseEmoji(emoji) == null) {
+                        throw new IllegalArgumentException(
+                                "I couldn't read that emoji. Use a normal emoji or a server emoji like `<:name:id>`.");
+                    }
+                    panel.buttonEmoji = emoji.isEmpty() ? null : emoji;
+                    panel.buttonStyle = parseStyleInput(value(event, "style"));
+                }
+                case "categories" -> panel.categories = parseCategories(value(event, "categories"));
+                case "questions" -> {
+                    saveQuestions(event, ctx);
                     return;
                 }
-                String promptText = event.getValue("questions") == null
-                        ? ""
-                        : event.getValue("questions").getAsString();
-                List<String> questions = parseQuestions(promptText);
-                Database.savePanelQuestions(panelId, categoryName, questions);
-                event.reply(questions.isEmpty()
-                                ? "Questions removed for **" + categoryName + "**."
-                                : "Saved " + questions.size() + " question(s) for **" + categoryName + "**.")
-                        .setEphemeral(true)
-                        .queue();
-                return;
-            }
-
-            var valueInput = event.getValue("value");
-            String value = valueInput == null ? "" : valueInput.getAsString().trim();
-            switch (action) {
-                case "content" -> panelData.content = value;
-                case "categories" -> panelData.categories = parseCategories(value);
-                case "staff_roles" -> panelData.staffRoles = parseRoles(value, event.getGuild());
-                case "ping_roles" -> panelData.pingRoles = parseRoles(value, event.getGuild());
-                case "ticket_category" -> panelData.ticketCategoryId = parseTicketCategory(value, event);
                 default -> {
-                    event.reply("That ticket panel setting isn't available.")
-                            .setEphemeral(true)
-                            .queue();
+                    deny(event, "That editor control isn't available.");
                     return;
                 }
             }
-            Database.savePanel(panelData);
-            event.reply("Ticket panel setting saved.")
-                    .setEphemeral(true)
-                    .queue();
-        } catch (NumberFormatException exception) {
-            event.reply("Invalid ticket panel ID.")
-                    .setEphemeral(true)
-                    .queue();
         } catch (IllegalArgumentException exception) {
-            event.reply(exception.getMessage())
-                    .setEphemeral(true)
-                    .queue();
-        } catch (SQLException exception) {
-            exception.printStackTrace();
-            event.reply("Couldn't save the panel content. Please try again.")
-                    .setEphemeral(true)
-                    .queue();
+            deny(event, exception.getMessage());
+            return;
         }
+        saveAndRefresh(event, ctx, "✅ Saved.");
     }
 
-    private List<String> parseCategories(String value) {
-        if (value.isBlank()) {
-            return new ArrayList<>();
+    private void saveQuestions(ModalInteractionEvent event, Ctx ctx) {
+        TicketPanelData panel = ctx.panel();
+        int index;
+        try {
+            index = Integer.parseInt(ctx.arg());
+        } catch (NumberFormatException exception) {
+            deny(event, "That category isn't available.");
+            return;
         }
+        if (index < 0 || index >= panel.categories.size()) {
+            deny(event, "That category no longer exists. Reopen the editor and try again.");
+            return;
+        }
+        String category = panel.categories.get(index);
+        List<String> questions;
+        try {
+            questions = parseQuestions(value(event, "questions"));
+            Database.savePanelQuestions(panel.id, category, questions);
+        } catch (IllegalArgumentException exception) {
+            deny(event, exception.getMessage());
+            return;
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            deny(event, "Couldn't save the questions. Please try again.");
+            return;
+        }
+        refresh(event, panel, ctx.page(), questions.isEmpty()
+                ? "✅ Removed the questions for **" + truncate(category, 40) + "**."
+                : "✅ Saved " + questions.size() + " question(s) for **" + truncate(category, 40) + "**.");
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Parsing and small helpers
+    // ---------------------------------------------------------------------------------------
+
+    private static TextInput input(
+            String id, TextInputStyle style, int maxLength, String value, String placeholder, boolean required) {
+        TextInput.Builder builder = TextInput.create(id, style)
+                .setRequired(required)
+                .setMaxLength(maxLength);
+        if (placeholder != null) {
+            builder.setPlaceholder(truncate(placeholder, 100));
+        }
+        if (value != null && !value.isBlank()) {
+            builder.setValue(value.length() > maxLength ? value.substring(0, maxLength) : value);
+        }
+        return builder.build();
+    }
+
+    private static String value(ModalInteractionEvent event, String id) {
+        var mapping = event.getValue(id);
+        return mapping == null ? "" : mapping.getAsString().trim();
+    }
+
+    private static String validUrl(String value, String what) {
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (!HTTP_URL.matcher(value).matches()) {
+            throw new IllegalArgumentException(what + " must be a link starting with http:// or https://.");
+        }
+        return value;
+    }
+
+    private static String parseStyleInput(String value) {
+        if (value.isEmpty()) {
+            return null;
+        }
+        return switch (value.toLowerCase(Locale.ROOT)) {
+            case "blue", "primary" -> "PRIMARY";
+            case "grey", "gray", "secondary" -> "SECONDARY";
+            case "green", "success" -> "SUCCESS";
+            case "red", "danger" -> "DANGER";
+            default -> throw new IllegalArgumentException("Button colour must be Blue, Grey, Green or Red.");
+        };
+    }
+
+    private static String styleName(String style) {
+        if (style == null) {
+            return "Blue";
+        }
+        return switch (style.toUpperCase(Locale.ROOT)) {
+            case "SECONDARY" -> "Grey";
+            case "SUCCESS" -> "Green";
+            case "DANGER" -> "Red";
+            default -> "Blue";
+        };
+    }
+
+    private static String normaliseColour(String colour) {
+        return "#" + (colour.startsWith("#") ? colour.substring(1) : colour).toUpperCase(Locale.ROOT);
+    }
+
+    private static List<String> parseCategories(String value) {
         LinkedHashSet<String> categories = new LinkedHashSet<>();
-        for (String item : value.split(",")) {
-            String category = item.trim();
-            if (!category.isEmpty()) {
-                if (category.length() > 100) {
-                    throw new IllegalArgumentException("Each category must be 100 characters or fewer.");
-                }
-                categories.add(category);
+        for (String line : value.split("[\\r\\n]+")) {
+            String category = line.trim();
+            if (category.isEmpty()) {
+                continue;
             }
+            if (category.length() > 100) {
+                throw new IllegalArgumentException("Each category must be 100 characters or fewer.");
+            }
+            categories.add(category);
         }
         if (categories.size() > 25) {
             throw new IllegalArgumentException("A ticket panel can have at most 25 categories.");
@@ -387,10 +769,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         return new ArrayList<>(categories);
     }
 
-    private List<String> parseQuestions(String value) {
-        if (value.isBlank()) {
-            return new ArrayList<>();
-        }
+    private static List<String> parseQuestions(String value) {
         List<String> questions = value.lines()
                 .map(String::trim)
                 .filter(question -> !question.isEmpty())
@@ -404,39 +783,18 @@ public class TicketPanelEditor extends ListenerAdapter {
         return questions;
     }
 
-    private List<String> parseRoles(String value, net.dv8tion.jda.api.entities.Guild guild) {
-        if (value.isBlank()) {
-            return new ArrayList<>();
-        }
-        LinkedHashSet<String> roles = new LinkedHashSet<>();
-        for (String item : value.split(",")) {
-            String roleId = item.trim().replaceAll("^<@&|>$", "");
-            if (!roleId.matches("\\d{17,20}")
-                    || guild.getRoleById(roleId) == null
-                    || guild.getPublicRole().getId().equals(roleId)) {
-                throw new IllegalArgumentException("Use valid role mentions or IDs from this server.");
-            }
-            roles.add(roleId);
-        }
-        if (roles.size() > 25) {
-            throw new IllegalArgumentException("A ticket panel can have at most 25 roles in each list.");
-        }
-        return new ArrayList<>(roles);
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
-    private String parseTicketCategory(String value, ModalInteractionEvent event) {
-        if (value.isBlank()) {
-            return null;
-        }
-        Matcher matcher = Pattern.compile("^(?:<#)?(\\d{17,20})>?$").matcher(value);
-        if (!matcher.matches() || event.getGuild().getCategoryById(matcher.group(1)) == null) {
-            throw new IllegalArgumentException("Use a valid category mention or category ID from this server.");
-        }
-        return matcher.group(1);
+    private static String orDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
-    private String formatMentions(List<String> values, String type) {
-        String prefix = "role".equals(type) ? "<@&" : "<#";
-        return values.stream().map(id -> prefix + id + ">").reduce((left, right) -> left + ", " + right).orElse("");
+    private static String truncate(String value, int max) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= max ? value : value.substring(0, Math.max(0, max - 1)) + "…";
     }
 }
