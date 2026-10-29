@@ -1,5 +1,6 @@
 package utils;
 
+import config.ConfigManager;
 import java.awt.Color;
 import java.util.List;
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -17,7 +18,7 @@ public final class EmbedHelpers {
 		if (guild != null) {
 			embed.setFooter(guild.getName(), guild.getIconUrl());
 		} else {
-			embed.setFooter("Garnet");
+			embed.setFooter(ConfigManager.getBotName());
 		}
 		return embed;
 	}

@@ -1,5 +1,6 @@
 package commands;
 
+import config.ConfigManager;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.section.Section;
@@ -31,7 +32,8 @@ public class Help extends ListenerAdapter implements Command {
 
         Thumbnail thumbnail = Thumbnail.fromUrl("https://cdn.discordapp.com/attachments/1543925274213752855/1555982521009967275/Garnet.png?backend=b2&ex=6ac28125&is=6ac12fa5&hm=c7db4d95dd5ea235683c449ed883de64513ffa92466db4c99c3673af61f22056&");
 
-        Section section1 = Section.of(thumbnail, TextDisplay.of("# Garnet Help\n" + "**Welcome to Garnet! Here are the available commands.**"));
+        String botName = ConfigManager.getBotName();
+        Section section1 = Section.of(thumbnail, TextDisplay.of("# " + botName + " Help\n" + "**Welcome to " + botName + "! Here are the available commands.**"));
 
         TextDisplay information = TextDisplay.of(
                 "### ℹ️ Information\n" +
@@ -70,7 +72,7 @@ public class Help extends ListenerAdapter implements Command {
                 ),
 
                 Separator.createDivider(Separator.Spacing.LARGE),
-                TextDisplay.of("-# © 2026 Garnet • All rights reserved.")
+                TextDisplay.of("-# © 2026 " + botName + " • All rights reserved.")
         );
 
         MessageCreateBuilder message = new MessageCreateBuilder()

@@ -1,3 +1,5 @@
+package config;
+
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -14,6 +16,8 @@ public class ConfigManager {
             token: ''
 
             # General settings
+            bot-name: 'Garnet'
+
             prefix: '!'
             language: en
 
@@ -41,6 +45,11 @@ public class ConfigManager {
 
     public static String getString(String key) {
         return (String) config.get(key);
+    }
+
+    public static String getBotName() {
+        String botName = getString("bot-name");
+        return botName == null || botName.isBlank() ? "Bot" : botName;
     }
 
     public static boolean getBoolean(String key) {

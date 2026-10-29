@@ -1,3 +1,4 @@
+import config.ConfigManager;
 import commands.Info;
 import commands.UserInfo;
 import commands.Avatar;
@@ -77,7 +78,7 @@ public class Main {
                 .awaitReady();
 
         ConsoleLogger.logConsole("-----------------------𝐁𝐨𝐭 𝐦𝐚𝐝𝐞 𝐛𝐲 𝐄𝐧𝐝𝐞𝐫𝐊𝐧𝐢𝐠𝐡𝐭𝟕𝐨𝐩-----------------------");
-        ConsoleLogger.logConsole("✅ Garnet is online!");
+        ConsoleLogger.logConsole("✅ " + ConfigManager.getBotName() + " is online!");
 
         List<Command> commands = List.<Command>of(
                 new Info(),

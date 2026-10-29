@@ -1,5 +1,6 @@
 package events;
 
+import config.ConfigManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -65,7 +66,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         try {
             if (DEFAULT_EMBED_VALUE.equals(selectedValue)) {
                 saveWelcomeEmbedId(guild, null);
-                event.editMessage("Welcome embed set to Garnet Default.")
+                event.editMessage("Welcome embed set to " + ConfigManager.getBotName() + " Default.")
                         .setComponents(List.of())
                         .queue();
                 return;
@@ -96,7 +97,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         Guild guild = event.getGuild();
         StringSelectMenu.Builder menu = StringSelectMenu.create("welcomer:setembed:" + guild.getId())
                 .setPlaceholder("Choose a welcome embed")
-                .addOption("Garnet Default", DEFAULT_EMBED_VALUE);
+                .addOption(ConfigManager.getBotName() + " Default", DEFAULT_EMBED_VALUE);
         String sql = "SELECT id, name FROM embeds WHERE guild_id = ? ORDER BY name LIMIT 24";
 
         try (Connection connection = Database.getConnection();
@@ -303,5 +304,4 @@ public class WelcomeListener extends ListenerAdapter implements Command {
     return null;
 }
     }
-
 
