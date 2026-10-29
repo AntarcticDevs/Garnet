@@ -18,6 +18,7 @@ import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import utils.ConsoleLogger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -220,7 +221,13 @@ public class TicketButton extends ListenerAdapter {
                                 Button.secondary("ticket:staff:transfer", "Transfer")),
                         ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket")))
                 .queue(
-                        ignored -> completion.accept("Ticket created: <#" + ticket.channelId + ">"),
+                        ignored -> {
+                            ConsoleLogger.logConsole("TICKET_CREATED ticketId=" + ticket.id
+                                    + " channelId=" + ticket.channelId
+                                    + " user=\"" + member.getUser().getName() + "\" userId=" + member.getId()
+                                    + " guild=\"" + guild.getName() + "\" guildId=" + guild.getId());
+                            completion.accept("Ticket created: <#" + ticket.channelId + ">");
+                        },
                         error -> completion.accept(
                                 "Ticket channel created, but I couldn't post its embed or controls. Check my channel permissions."));
     }

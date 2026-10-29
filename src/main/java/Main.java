@@ -12,6 +12,7 @@ import commands.Ban;
 import commands.Kick;
 
 import events.WelcomeListener;
+import events.ConsoleActivityLogger;
 import tickets.TicketButton;
 import tickets.TicketPanelEditor;
 import net.dv8tion.jda.api.JDA;
@@ -69,7 +70,8 @@ public class Main {
                         new Kick(),
                         // new ComponentsTest(),
                         new TicketButton(),
-                        new TicketPanelEditor()
+                        new TicketPanelEditor(),
+                        new ConsoleActivityLogger()
                 )
                 .addEventListeners(
                         new WelcomeListener()
