@@ -21,6 +21,10 @@
 - **Maven**
 - **SQLite**
 
+## Configuration
+
+On first startup, Garnet creates `config.yml` in the working directory. Set the bot's Discord token in the `token` field before launching the bot. Keep this file private; it is excluded from Git.
+
 ##  Ticket System
 
 Garnet's ticket system is being developed from the ground up with a focus on reliable data management and maintainable code.

@@ -17,8 +17,6 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
-import io.github.cdimascio.dotenv.Dotenv;
-
 import java.util.List;
 import java.util.ArrayList;
 
@@ -29,17 +27,23 @@ import database.Database;
 import java.sql.SQLException;
 import utils.ConsoleLogger;
 
-
+import java.io.IOException;
 
 public class Main {
 
         public static void main(String[] args) throws InterruptedException {
-        Dotenv dotenv = Dotenv.load();
+        try {
+            ConfigManager.createIfMissing();
+            ConfigManager.load();
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
 
-        String token = dotenv.get("DISCORD_TOKEN");
+        String token = ConfigManager.getString("token");
 
         if (token == null || token.isBlank()) {
-            throw new IllegalStateException("DISCORD_TOKEN environment variable is not set");
+            throw new IllegalStateException("token in config.yml is not set");
         }
 
         try {

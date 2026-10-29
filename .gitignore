@@ -2,3 +2,4 @@ target/
 garnet.db
 .vscode/
 .env
+config.yml

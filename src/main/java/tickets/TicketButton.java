@@ -192,6 +192,7 @@ public class TicketButton extends ListenerAdapter {
         TextChannel channel = guild.getTextChannelById(ticket.channelId);
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
+                .setAuthor(member.getUser().getName(), null, member.getUser().getAvatarUrl())
                 .setDescription("Opened by " + member.getAsMention() + ". Please describe your request here.")
                 .setFooter("Ticket ID: " + ticket.id);
         for (int i = 0; i < Math.min(answers.size(), 5); i++) {
