@@ -17,7 +17,7 @@ public class TranscriptManager {
     private static final int HISTORY_PAGE_SIZE = 100;
     private static final String TRANSCRIPT_SUFFIX = "-transcript.txt";
     private static final DateTimeFormatter TIMESTAMP_FORMAT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss XXX");
 
     public CompletableFuture<Void> sendTranscript(TextChannel channel, InteractionHook hook) {
         List<Message> messages = new ArrayList<>();
