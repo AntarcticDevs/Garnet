@@ -10,6 +10,7 @@ import java.util.List;
 import java.sql.PreparedStatement;
 import tickets.TicketData;
 import tickets.TicketPanelData;
+import tickets.TicketQuestion;
 
 public class Database {
 
@@ -156,6 +157,12 @@ public class Database {
                         FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
                     )
                     """);
+
+            // Per-question settings. Existing questions keep the old behaviour: paragraph and required.
+            addColumnIfMissing(connection, "ticket_panel_questions", "paragraph INTEGER NOT NULL DEFAULT 1");
+            addColumnIfMissing(connection, "ticket_panel_questions", "required INTEGER NOT NULL DEFAULT 1");
+            addColumnIfMissing(connection, "ticket_panel_questions", "placeholder TEXT");
+            addColumnIfMissing(connection, "ticket_panel_questions", "max_length INTEGER");
 
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS guild_rules (
@@ -651,11 +658,11 @@ public class Database {
         }
     }
 
-    public static List<String> getPanelQuestions(int panelId, String categoryName) throws SQLException {
-        List<String> questions = new java.util.ArrayList<>();
+    public static List<TicketQuestion> getPanelQuestions(int panelId, String categoryName) throws SQLException {
+        List<TicketQuestion> questions = new java.util.ArrayList<>();
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
-                        SELECT prompt
+                        SELECT prompt, paragraph, required, placeholder, max_length
                         FROM ticket_panel_questions
                         WHERE panel_id = ? AND category_name = ?
                         ORDER BY position
@@ -664,14 +671,22 @@ public class Database {
             statement.setString(2, categoryName);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    questions.add(resultSet.getString("prompt"));
+                    String prompt = resultSet.getString("prompt");
+                    boolean paragraph = resultSet.getInt("paragraph") != 0;
+                    boolean required = resultSet.getInt("required") != 0;
+                    String placeholder = resultSet.getString("placeholder");
+                    // wasNull() refers to the most recent column read, so check it right after this one.
+                    int maxLengthValue = resultSet.getInt("max_length");
+                    Integer maxLength = resultSet.wasNull() ? null : maxLengthValue;
+                    questions.add(new TicketQuestion(prompt, paragraph, required, placeholder, maxLength));
                 }
             }
         }
         return questions;
     }
 
-    public static void savePanelQuestions(int panelId, String categoryName, List<String> questions)
+    /** Replaces all questions of one category, keeping the given order. */
+    public static void savePanelQuestions(int panelId, String categoryName, List<TicketQuestion> questions)
             throws SQLException {
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
@@ -683,14 +698,24 @@ public class Database {
                     delete.executeUpdate();
                 }
                 try (PreparedStatement insert = connection.prepareStatement("""
-                        INSERT INTO ticket_panel_questions (panel_id, category_name, position, prompt)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO ticket_panel_questions
+                            (panel_id, category_name, position, prompt, paragraph, required, placeholder, max_length)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """)) {
                     for (int i = 0; i < questions.size(); i++) {
+                        TicketQuestion question = questions.get(i);
                         insert.setInt(1, panelId);
                         insert.setString(2, categoryName);
                         insert.setInt(3, i);
-                        insert.setString(4, questions.get(i));
+                        insert.setString(4, question.prompt());
+                        insert.setInt(5, question.paragraph() ? 1 : 0);
+                        insert.setInt(6, question.required() ? 1 : 0);
+                        insert.setString(7, question.placeholder());
+                        if (question.maxLength() == null) {
+                            insert.setNull(8, java.sql.Types.INTEGER);
+                        } else {
+                            insert.setInt(8, question.maxLength());
+                        }
                         insert.addBatch();
                     }
                     insert.executeBatch();

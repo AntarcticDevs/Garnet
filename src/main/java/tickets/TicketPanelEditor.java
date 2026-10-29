@@ -3,9 +3,11 @@ package tickets;
 import database.Database;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.checkbox.Checkbox;
 import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.radiogroup.RadioGroup;
 import net.dv8tion.jda.api.components.section.Section;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.components.selections.SelectOption;
@@ -57,7 +59,9 @@ public class TicketPanelEditor extends ListenerAdapter {
     public enum Page {
         APPEARANCE("appearance", "Appearance", "Title, colour, images and the button"),
         ROUTING("routing", "Roles & routing", "Staff and ping roles, channels"),
-        CATEGORIES("categories", "Categories", "Dropdown categories and their questions");
+        CATEGORIES("categories", "Categories", "Dropdown categories and their questions"),
+        /** Sub-page of Categories that edits the questions of one category; not in the page menu. */
+        QUESTIONS("questions", "Questions", "The form questions of one category");
 
         final String key;
         final String label;
@@ -113,6 +117,13 @@ public class TicketPanelEditor extends ListenerAdapter {
         return new MessageEditBuilder().useComponentsV2().setComponents(render(panel, page, guild, notice)).build();
     }
 
+    private MessageEditData questionsView(TicketPanelData panel, int categoryIndex, Guild guild, String notice) {
+        return new MessageEditBuilder()
+                .useComponentsV2()
+                .setComponents(render(panel, Page.QUESTIONS, guild, notice, categoryIndex))
+                .build();
+    }
+
     private MessageEditData plainView(String text) {
         return new MessageEditBuilder()
                 .useComponentsV2()
@@ -121,6 +132,16 @@ public class TicketPanelEditor extends ListenerAdapter {
     }
 
     private Container render(TicketPanelData panel, Page page, Guild guild, String notice) {
+        return render(panel, page, guild, notice, -1);
+    }
+
+    /** {@code categoryIndex} is only used by the QUESTIONS page. */
+    private Container render(TicketPanelData panel, Page requested, Guild guild, String notice, int categoryIndex) {
+        // The questions page needs a valid category; otherwise fall back to the category list.
+        Page page = requested == Page.QUESTIONS && (categoryIndex < 0 || categoryIndex >= panel.categories.size())
+                ? Page.CATEGORIES
+                : requested;
+
         List<ContainerChildComponent> children = new ArrayList<>();
         children.add(TextDisplay.of("# Panel editor: " + truncate(panel.name, 60)));
         children.add(TextDisplay.of(statusLine(panel)));
@@ -133,6 +154,12 @@ public class TicketPanelEditor extends ListenerAdapter {
             case APPEARANCE -> addAppearance(children, panel, page);
             case ROUTING -> addRouting(children, panel, page, guild);
             case CATEGORIES -> addCategories(children, panel, page);
+            case QUESTIONS -> addQuestions(children, panel, categoryIndex);
+        }
+
+        if (page == Page.QUESTIONS) {
+            // The question manager has its own Back button instead of the page menu and action row.
+            return Container.of(children).withAccentColor(TicketPanel.parseColour(panel.embedColour));
         }
 
         children.add(Separator.createDivider(Separator.Spacing.SMALL));
@@ -158,6 +185,9 @@ public class TicketPanelEditor extends ListenerAdapter {
         StringSelectMenu.Builder menu = StringSelectMenu.create(id(panel, current, "nav"))
                 .setPlaceholder("Go to a page");
         for (Page page : Page.values()) {
+            if (page == Page.QUESTIONS) {
+                continue;
+            }
             menu.addOptions(SelectOption.of(page.label, page.key).withDescription(page.description));
         }
         menu.setDefaultValues(current.key);
@@ -272,12 +302,85 @@ public class TicketPanelEditor extends ListenerAdapter {
     }
 
     private int questionCount(TicketPanelData panel, String category) {
+        return loadQuestions(panel, category).size();
+    }
+
+    private List<TicketQuestion> loadQuestions(TicketPanelData panel, String category) {
         try {
-            return Database.getPanelQuestions(panel.id, category).size();
+            return Database.getPanelQuestions(panel.id, category);
         } catch (SQLException exception) {
             exception.printStackTrace();
-            return 0;
+            return List.of();
         }
+    }
+
+    /** The question manager for one category: every question has its own Edit button. */
+    private void addQuestions(List<ContainerChildComponent> children, TicketPanelData panel, int categoryIndex) {
+        String category = panel.categories.get(categoryIndex);
+        List<TicketQuestion> questions = loadQuestions(panel, category);
+        String categoryArg = Integer.toString(categoryIndex);
+
+        children.add(TextDisplay.of("## Questions: " + truncate(category, 60)
+                + "\n-# Members answer these in a form before their ticket is created. Up to "
+                + TicketQuestion.MAX_QUESTIONS + " questions."));
+        if (questions.isEmpty()) {
+            children.add(TextDisplay.of("*No questions: tickets in this category open straight away.*"));
+        }
+        for (int index = 0; index < questions.size(); index++) {
+            TicketQuestion question = questions.get(index);
+            String details = question.styleName() + " · " + (question.required() ? "Required" : "Optional")
+                    + (question.maxLength() == null ? "" : " · max " + question.maxLength());
+            String placeholder = question.placeholder() == null
+                    ? ""
+                    : "\nPlaceholder: " + truncate(question.placeholder(), 60);
+            children.add(Section.of(
+                    Button.secondary(id(panel, Page.QUESTIONS, "qedit", categoryArg + ":" + index), "Edit"),
+                    TextDisplay.of("**" + (index + 1) + ". " + truncate(question.prompt(), 45) + "**\n"
+                            + details + placeholder)));
+        }
+        if (!questions.isEmpty()) {
+            StringSelectMenu.Builder remove = StringSelectMenu.create(id(panel, Page.QUESTIONS, "qremove", categoryArg))
+                    .setPlaceholder("Remove a question");
+            for (int index = 0; index < questions.size(); index++) {
+                remove.addOptions(SelectOption.of(
+                        "Remove: " + truncate(questions.get(index).prompt(), 90), Integer.toString(index)));
+            }
+            children.add(ActionRow.of(remove.build()));
+        }
+        children.add(ActionRow.of(
+                Button.primary(id(panel, Page.QUESTIONS, "qadd", categoryArg), "Add question")
+                        .withDisabled(questions.size() >= TicketQuestion.MAX_QUESTIONS),
+                Button.secondary(id(panel, Page.QUESTIONS, "back"), "Back to categories")));
+    }
+
+    /**
+     * The add/edit form for one question. {@code question} is null when adding. Short/Paragraph is a
+     * radio group and Required a checkbox, so nothing has to be typed for those settings.
+     */
+    private Modal questionModal(TicketPanelData panel, int categoryIndex, String questionKey, TicketQuestion question) {
+        boolean paragraph = question != null && question.paragraph();
+        return Modal.create(id(panel, Page.QUESTIONS, "qmodal", categoryIndex + ":" + questionKey),
+                        question == null ? "Add a question" : "Edit question")
+                .addComponents(
+                        Label.of("Question", input("prompt", TextInputStyle.SHORT,
+                                TicketQuestion.MAX_PROMPT_LENGTH, question == null ? null : question.prompt(),
+                                "What is your order number?", true)),
+                        Label.of("Placeholder (optional)", input("placeholder", TextInputStyle.SHORT,
+                                TicketQuestion.MAX_PLACEHOLDER_LENGTH, question == null ? null : question.placeholder(),
+                                "Grey hint text inside the box", false)),
+                        Label.of("Maximum length (optional)", input("maxlength", TextInputStyle.SHORT, 4,
+                                question == null || question.maxLength() == null ? null : question.maxLength().toString(),
+                                "1 to " + TicketQuestion.MAX_ANSWER_LENGTH + " (default " + TicketQuestion.MAX_ANSWER_LENGTH + ")",
+                                false)),
+                        Label.of("Answer box", "Short is one line, paragraph allows several",
+                                RadioGroup.create("style")
+                                        .addOption("Short", "SHORT", "A single line")
+                                        .addOption("Paragraph", "PARAGRAPH", "Several lines")
+                                        .setSelectedValue(paragraph ? "PARAGRAPH" : "SHORT")
+                                        .build()),
+                        Label.of("Required", "Members must answer to open a ticket",
+                                Checkbox.of("required", question == null || question.required())))
+                .build();
     }
 
     private static Section row(String buttonId, String text) {
@@ -338,6 +441,30 @@ public class TicketPanelEditor extends ListenerAdapter {
 
     private void refresh(IMessageEditCallback event, TicketPanelData panel, Page page, String notice) {
         event.editMessage(view(panel, page, event.getGuild(), notice)).queue();
+    }
+
+    private void refreshQuestions(IMessageEditCallback event, TicketPanelData panel, int categoryIndex, String notice) {
+        event.editMessage(questionsView(panel, categoryIndex, event.getGuild(), notice)).queue();
+    }
+
+    /** Parses "categoryIndex" or "categoryIndex:questionIndex" from a component ID argument; null if invalid. */
+    private static int[] parseIndexes(String arg, int expected) {
+        if (arg == null) {
+            return null;
+        }
+        String[] parts = arg.split(":");
+        if (parts.length < expected) {
+            return null;
+        }
+        try {
+            int[] indexes = new int[expected];
+            for (int i = 0; i < expected; i++) {
+                indexes[i] = "new".equals(parts[i]) ? -1 : Integer.parseInt(parts[i]);
+            }
+            return indexes;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
     }
 
     private <E extends IMessageEditCallback & IReplyCallback> void saveAndRefresh(E event, Ctx ctx, String notice) {
@@ -405,6 +532,9 @@ public class TicketPanelEditor extends ListenerAdapter {
                             input("categories", TextInputStyle.PARAGRAPH, 2500,
                                     String.join("\n", panel.categories), "Billing\nSupport\nReport a user", false)))
                     .build()).queue();
+            case "back" -> refresh(event, panel, Page.CATEGORIES, null);
+            case "qadd" -> openQuestionModal(event, ctx, true);
+            case "qedit" -> openQuestionModal(event, ctx, false);
             case "preview" -> preview(event, panel);
             case "publish" -> publish(event, ctx);
             case "delete" -> event.editMessage(deleteConfirmation(panel, page)).queue();
@@ -415,6 +545,40 @@ public class TicketPanelEditor extends ListenerAdapter {
                     .queue();
             default -> deny(event, "That editor control isn't available.");
         }
+    }
+
+    private void openQuestionModal(ButtonInteractionEvent event, Ctx ctx, boolean adding) {
+        TicketPanelData panel = ctx.panel();
+        int[] indexes = parseIndexes(ctx.arg(), adding ? 1 : 2);
+        if (indexes == null || indexes[0] < 0 || indexes[0] >= panel.categories.size()) {
+            deny(event, "That category no longer exists. Reopen the editor and try again.");
+            return;
+        }
+        int categoryIndex = indexes[0];
+        List<TicketQuestion> questions;
+        try {
+            questions = Database.getPanelQuestions(panel.id, panel.categories.get(categoryIndex));
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            deny(event, "Couldn't load that category's questions. Please try again.");
+            return;
+        }
+        if (adding) {
+            if (questions.size() >= TicketQuestion.MAX_QUESTIONS) {
+                refreshQuestions(event, panel, categoryIndex, "⚠️ A category can have at most "
+                        + TicketQuestion.MAX_QUESTIONS + " questions.");
+                return;
+            }
+            event.replyModal(questionModal(panel, categoryIndex, "new", null)).queue();
+            return;
+        }
+        int questionIndex = indexes[1];
+        if (questionIndex < 0 || questionIndex >= questions.size()) {
+            refreshQuestions(event, panel, categoryIndex, "⚠️ That question no longer exists.");
+            return;
+        }
+        event.replyModal(questionModal(panel, categoryIndex, Integer.toString(questionIndex),
+                questions.get(questionIndex))).queue();
     }
 
     private void preview(ButtonInteractionEvent event, TicketPanelData panel) {
@@ -516,23 +680,41 @@ public class TicketPanelEditor extends ListenerAdapter {
                     deny(event, "That category no longer exists. Reopen the editor and try again.");
                     return;
                 }
-                String category = ctx.panel().categories.get(index);
-                List<String> questions;
-                try {
-                    questions = Database.getPanelQuestions(ctx.panel().id, category);
-                } catch (SQLException exception) {
-                    exception.printStackTrace();
-                    deny(event, "Couldn't load that category's questions. Please try again.");
-                    return;
-                }
-                event.replyModal(Modal.create(id(ctx.panel(), ctx.page(), "questions", Integer.toString(index)),
-                                "Questions: " + truncate(category, 30))
-                        .addComponents(Label.of("Questions (one per line, up to 5)",
-                                input("questions", TextInputStyle.PARAGRAPH, 400, String.join("\n", questions),
-                                        "What is your order number?\nWhat happened?", false)))
-                        .build()).queue();
+                refreshQuestions(event, ctx.panel(), index, null);
             }
+            case "qremove" -> removeQuestion(event, ctx, value);
             default -> deny(event, "That editor control isn't available.");
+        }
+    }
+
+    private void removeQuestion(StringSelectInteractionEvent event, Ctx ctx, String selected) {
+        TicketPanelData panel = ctx.panel();
+        int[] indexes = parseIndexes(ctx.arg(), 1);
+        int questionIndex;
+        try {
+            questionIndex = Integer.parseInt(selected);
+        } catch (NumberFormatException exception) {
+            deny(event, "That question isn't available.");
+            return;
+        }
+        if (indexes == null || indexes[0] < 0 || indexes[0] >= panel.categories.size()) {
+            deny(event, "That category no longer exists. Reopen the editor and try again.");
+            return;
+        }
+        int categoryIndex = indexes[0];
+        String category = panel.categories.get(categoryIndex);
+        try {
+            List<TicketQuestion> questions = new ArrayList<>(Database.getPanelQuestions(panel.id, category));
+            if (questionIndex < 0 || questionIndex >= questions.size()) {
+                refreshQuestions(event, panel, categoryIndex, "⚠️ That question no longer exists.");
+                return;
+            }
+            TicketQuestion removed = questions.remove(questionIndex);
+            Database.savePanelQuestions(panel.id, category, questions);
+            refreshQuestions(event, panel, categoryIndex, "✅ Removed **" + truncate(removed.prompt(), 45) + "**.");
+        } catch (SQLException exception) {
+            exception.printStackTrace();
+            deny(event, "Couldn't remove that question. Please try again.");
         }
     }
 
@@ -642,8 +824,8 @@ public class TicketPanelEditor extends ListenerAdapter {
                     panel.buttonStyle = parseStyleInput(value(event, "style"));
                 }
                 case "categories" -> panel.categories = parseCategories(value(event, "categories"));
-                case "questions" -> {
-                    saveQuestions(event, ctx);
+                case "qmodal" -> {
+                    saveQuestion(event, ctx);
                     return;
                 }
                 default -> {
@@ -658,35 +840,87 @@ public class TicketPanelEditor extends ListenerAdapter {
         saveAndRefresh(event, ctx, "✅ Saved.");
     }
 
-    private void saveQuestions(ModalInteractionEvent event, Ctx ctx) {
+    /** Saves the add/edit question form; the argument is "categoryIndex:questionIndex" or "categoryIndex:new". */
+    private void saveQuestion(ModalInteractionEvent event, Ctx ctx) {
         TicketPanelData panel = ctx.panel();
-        int index;
-        try {
-            index = Integer.parseInt(ctx.arg());
-        } catch (NumberFormatException exception) {
-            deny(event, "That category isn't available.");
-            return;
-        }
-        if (index < 0 || index >= panel.categories.size()) {
+        int[] indexes = parseIndexes(ctx.arg(), 2);
+        if (indexes == null || indexes[0] < 0 || indexes[0] >= panel.categories.size()) {
             deny(event, "That category no longer exists. Reopen the editor and try again.");
             return;
         }
-        String category = panel.categories.get(index);
-        List<String> questions;
+        int categoryIndex = indexes[0];
+        int questionIndex = indexes[1];
+        String category = panel.categories.get(categoryIndex);
+
+        TicketQuestion question;
         try {
-            questions = parseQuestions(value(event, "questions"));
-            Database.savePanelQuestions(panel.id, category, questions);
+            question = readQuestion(event);
         } catch (IllegalArgumentException exception) {
             deny(event, exception.getMessage());
             return;
+        }
+
+        try {
+            List<TicketQuestion> questions = new ArrayList<>(Database.getPanelQuestions(panel.id, category));
+            boolean adding = questionIndex < 0;
+            if (adding) {
+                if (questions.size() >= TicketQuestion.MAX_QUESTIONS) {
+                    refreshQuestions(event, panel, categoryIndex, "⚠️ A category can have at most "
+                            + TicketQuestion.MAX_QUESTIONS + " questions.");
+                    return;
+                }
+                questions.add(question);
+            } else {
+                if (questionIndex >= questions.size()) {
+                    refreshQuestions(event, panel, categoryIndex, "⚠️ That question no longer exists.");
+                    return;
+                }
+                questions.set(questionIndex, question);
+            }
+            Database.savePanelQuestions(panel.id, category, questions);
+            refreshQuestions(event, panel, categoryIndex,
+                    (adding ? "✅ Added **" : "✅ Saved **") + truncate(question.prompt(), 45) + "**.");
         } catch (SQLException exception) {
             exception.printStackTrace();
-            deny(event, "Couldn't save the questions. Please try again.");
-            return;
+            deny(event, "Couldn't save the question. Please try again.");
         }
-        refresh(event, panel, ctx.page(), questions.isEmpty()
-                ? "✅ Removed the questions for **" + truncate(category, 40) + "**."
-                : "✅ Saved " + questions.size() + " question(s) for **" + truncate(category, 40) + "**.");
+    }
+
+    /** Reads and validates the question form. */
+    private static TicketQuestion readQuestion(ModalInteractionEvent event) {
+        String prompt = value(event, "prompt");
+        if (prompt.isEmpty()) {
+            throw new IllegalArgumentException("A question needs some text.");
+        }
+        if (prompt.length() > TicketQuestion.MAX_PROMPT_LENGTH) {
+            throw new IllegalArgumentException("A question can be at most "
+                    + TicketQuestion.MAX_PROMPT_LENGTH + " characters (a Discord limit).");
+        }
+        String placeholder = blankToNull(value(event, "placeholder"));
+        if (placeholder != null && placeholder.length() > TicketQuestion.MAX_PLACEHOLDER_LENGTH) {
+            throw new IllegalArgumentException("A placeholder can be at most "
+                    + TicketQuestion.MAX_PLACEHOLDER_LENGTH + " characters.");
+        }
+
+        Integer maxLength = null;
+        String maxLengthText = value(event, "maxlength");
+        if (!maxLengthText.isEmpty()) {
+            try {
+                maxLength = Integer.parseInt(maxLengthText);
+            } catch (NumberFormatException exception) {
+                maxLength = 0;
+            }
+            if (maxLength < 1 || maxLength > TicketQuestion.MAX_ANSWER_LENGTH) {
+                throw new IllegalArgumentException("Maximum length must be a number from 1 to "
+                        + TicketQuestion.MAX_ANSWER_LENGTH + ".");
+            }
+        }
+
+        var style = event.getValue("style");
+        boolean paragraph = style != null && "PARAGRAPH".equals(style.getAsOptionalString());
+        var required = event.getValue("required");
+        return new TicketQuestion(prompt, paragraph, required != null && required.getAsBoolean(),
+                placeholder, maxLength);
     }
 
     // ---------------------------------------------------------------------------------------
@@ -767,20 +1001,6 @@ public class TicketPanelEditor extends ListenerAdapter {
             throw new IllegalArgumentException("A ticket panel can have at most 25 categories.");
         }
         return new ArrayList<>(categories);
-    }
-
-    private static List<String> parseQuestions(String value) {
-        List<String> questions = value.lines()
-                .map(String::trim)
-                .filter(question -> !question.isEmpty())
-                .toList();
-        if (questions.size() > 5) {
-            throw new IllegalArgumentException("A category can have at most five questions.");
-        }
-        if (questions.stream().anyMatch(question -> question.length() > 45)) {
-            throw new IllegalArgumentException("Each question must be 45 characters or fewer.");
-        }
-        return questions;
     }
 
     private static String blankToNull(String value) {
