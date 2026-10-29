@@ -85,7 +85,7 @@ public class TicketButton extends ListenerAdapter {
             }
             String categoryName = event.getValues().get(0);
             event.getMessage().editMessageComponents(ActionRow.of(TicketPanel.categoryMenu(panelData))).queue();
-            List<String> questions = Database.getPanelQuestions(panelId, categoryName);
+            List<TicketQuestion> questions = Database.getPanelQuestions(panelId, categoryName);
             if (questions.isEmpty()) {
                 event.deferReply(true)
                         .queue(hook -> createTicket(event.getGuild(), event.getMember(), panelData, categoryName,
@@ -96,10 +96,16 @@ public class TicketButton extends ListenerAdapter {
             }
             List<Label> fields = new ArrayList<>();
             for (int index = 0; index < questions.size(); index++) {
-                TextInput answer = TextInput.create("answer" + index, TextInputStyle.PARAGRAPH)
-                        .setRequired(true)
-                        .build();
-                fields.add(Label.of(questions.get(index), answer));
+                TicketQuestion question = questions.get(index);
+                TextInput.Builder answer = TextInput.create(
+                                "answer" + index,
+                                question.paragraph() ? TextInputStyle.PARAGRAPH : TextInputStyle.SHORT)
+                        .setRequired(question.required())
+                        .setMaxLength(question.effectiveMaxLength());
+                if (question.placeholder() != null && !question.placeholder().isBlank()) {
+                    answer.setPlaceholder(question.placeholder());
+                }
+                fields.add(Label.of(question.prompt(), answer.build()));
             }
             Modal modal = Modal.create("ticket:form:" + panelId + ":" + panelData.categories.indexOf(categoryName),
                     "New Ticket Request")
@@ -191,6 +197,10 @@ public class TicketButton extends ListenerAdapter {
                 .setFooter("Ticket ID: " + ticket.id);
         for (int i = 0; i < Math.min(answers.size(), 5); i++) {
             String answer = answers.get(i);
+            if (answer.isBlank()) {
+                // An optional question the member skipped.
+                answer = "*Not answered*";
+            }
             embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer,
                     false);
         }
@@ -253,18 +263,22 @@ public class TicketButton extends ListenerAdapter {
                 return;
             }
             String categoryName = panelData.categories.get(categoryIndex);
-            List<String> questions = Database.getPanelQuestions(panelId, categoryName);
+            List<TicketQuestion> questions = Database.getPanelQuestions(panelId, categoryName);
+            List<String> prompts = new ArrayList<>();
             List<String> answers = new ArrayList<>();
             for (int index = 0; index < questions.size(); index++) {
+                TicketQuestion question = questions.get(index);
                 var field = event.getValue("answer" + index);
-                if (field == null || field.getAsString().isBlank()) {
-                    event.reply("Please complete all ticket questions.").setEphemeral(true).queue();
+                String answer = field == null ? "" : field.getAsString().trim();
+                if (question.required() && answer.isEmpty()) {
+                    event.reply("Please answer: " + question.prompt()).setEphemeral(true).queue();
                     return;
                 }
-                answers.add(field.getAsString());
+                prompts.add(question.prompt());
+                answers.add(answer);
             }
             event.deferReply(true).queue(hook -> createTicket(
-                    event.getGuild(), event.getMember(), panelData, categoryName, questions, answers,
+                    event.getGuild(), event.getMember(), panelData, categoryName, prompts, answers,
                     message -> hook.editOriginal(message).queue()));
         } catch (NumberFormatException | SQLException exception) {
             exception.printStackTrace();
