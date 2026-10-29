@@ -18,6 +18,15 @@ public class ConfigManager {
             # General settings
             bot-name: 'Garnet'
 
+            # Optional links shown in /help; leave blank to hide each button
+            support-url: ''
+            terms-url: ''
+            privacy-url: ''
+            security-url: ''
+
+            # Optional /help thumbnail override; blank uses the bot's Discord avatar
+            help-thumbnail-url: ''
+
             prefix: '!'
             language: en
 

@@ -3,6 +3,7 @@ package commands;
 import config.ConfigManager;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.components.section.Section;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -16,6 +17,8 @@ import net.dv8tion.jda.api.components.separator.Separator;
 
 import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
 
+import java.util.ArrayList;
+import java.util.List;
 
 public class Help extends ListenerAdapter implements Command {
 
@@ -30,10 +33,17 @@ public class Help extends ListenerAdapter implements Command {
             return;
         }
 
-        Thumbnail thumbnail = Thumbnail.fromUrl("https://cdn.discordapp.com/attachments/1543925274213752855/1555982521009967275/Garnet.png?backend=b2&ex=6ac28125&is=6ac12fa5&hm=c7db4d95dd5ea235683c449ed883de64513ffa92466db4c99c3673af61f22056&");
-
         String botName = ConfigManager.getBotName();
-        Section section1 = Section.of(thumbnail, TextDisplay.of("# " + botName + " Help\n" + "**Welcome to " + botName + "! Here are the available commands.**"));
+        String thumbnailUrl = ConfigManager.getString("help-thumbnail-url");
+        if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+            thumbnailUrl = event.getJDA().getSelfUser().getEffectiveAvatarUrl();
+        }
+
+        TextDisplay heading = TextDisplay.of(
+                "# " + botName + " Help\n" + "**Welcome to " + botName + "! Here are the available commands.**");
+        ContainerChildComponent headingComponent = thumbnailUrl == null || thumbnailUrl.isBlank()
+                ? heading
+                : Section.of(Thumbnail.fromUrl(thumbnailUrl), heading);
 
         TextDisplay information = TextDisplay.of(
                 "### ℹ️ Information\n" +
@@ -51,34 +61,39 @@ public class Help extends ListenerAdapter implements Command {
         );
         TextDisplay fun = TextDisplay.of("### 🎉 Fun\n" + "Coming soon...");
         TextDisplay utility = TextDisplay.of("### ⚙️ Utility\n" + "`/embed` — Create, edit, and send embeds.\n" + "`/rules select` — Select a saved embed as this server's rules.");
-        Button button1 = Button.link("https://dsc.gg/garnetbot", "Support Server");
-        Button button2 = Button.link("https://github.com/GarnetDiscordBot/Garnet/blob/main/TERMS.md", "Terms of Service");
-        Button button3 = Button.link("https://github.com/GarnetDiscordBot/Garnet/blob/main/PRIVACY.md", "Privacy");
-        Button button4 = Button.link("https://github.com/GarnetDiscordBot/Garnet/blob/main/SECURITY.md", "Security");
+        List<ContainerChildComponent> children = new ArrayList<>();
+        children.add(headingComponent);
+        children.add(Separator.createDivider(Separator.Spacing.LARGE));
+        children.add(information);
+        children.add(moderation);
+        children.add(fun);
+        children.add(utility);
 
-        Container container = Container.of(
-                section1,
-                Separator.createDivider(Separator.Spacing.LARGE),
-                information,
-                moderation,
-                fun,
-                utility,
-                Separator.createDivider(Separator.Spacing.LARGE),
-                ActionRow.of(
-                        button1,
-                        button2,
-                        button3,
-                        button4
-                ),
+        List<Button> linkButtons = new ArrayList<>();
+        addLinkButton(linkButtons, "support-url", "Support Server");
+        addLinkButton(linkButtons, "terms-url", "Terms of Service");
+        addLinkButton(linkButtons, "privacy-url", "Privacy");
+        addLinkButton(linkButtons, "security-url", "Security");
+        if (!linkButtons.isEmpty()) {
+            children.add(Separator.createDivider(Separator.Spacing.LARGE));
+            children.add(ActionRow.of(linkButtons));
+        }
 
-                Separator.createDivider(Separator.Spacing.LARGE),
-                TextDisplay.of("-# © 2026 " + botName + " • All rights reserved.")
-        );
+        children.add(Separator.createDivider(Separator.Spacing.LARGE));
+        children.add(TextDisplay.of("-# © 2026 " + botName + " • All rights reserved."));
+        Container container = Container.of(children);
 
         MessageCreateBuilder message = new MessageCreateBuilder()
                 .useComponentsV2()
                 .addComponents(container);
 
         event.reply(message.build()).queue();
+    }
+
+    private void addLinkButton(List<Button> buttons, String configKey, String label) {
+        String url = ConfigManager.getString(configKey);
+        if (url != null && !url.isBlank()) {
+            buttons.add(Button.link(url, label));
+        }
     }
 }
