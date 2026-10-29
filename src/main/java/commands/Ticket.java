@@ -15,7 +15,6 @@ import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
-import net.dv8tion.jda.api.utils.FileUpload;
 import tickets.TicketPanel;
 import tickets.TicketPanelData;
 import tickets.TicketPanelEditor;
@@ -480,13 +479,17 @@ public class Ticket extends ListenerAdapter implements Command {
             case "transcript" -> {
                 event.deferReply(true).queue(hook -> {
                     try {
-                        byte[] transcript = new TranscriptManager().createTranscript(channel);
-                        hook.sendFiles(FileUpload.fromData(transcript, channel.getName() + "-transcript.txt"))
-                                .queue(
-                                        ignored -> { },
-                                        error -> hook.editOriginal("Couldn't upload the transcript. Check my permissions.")
-                                                .queue()
-                                );
+                        new TranscriptManager().sendTranscript(channel, hook)
+                                .whenComplete((ignored, error) -> {
+                                    if (error != null) {
+                                        System.err.println("Transcript generation failed:");
+                                        error.printStackTrace();
+                                        hook.editOriginal(
+                                                        "Couldn't create or upload the transcript. Please try again.")
+                                                .queue();
+                                        return;
+                                    }
+                                });
                     } catch (RuntimeException exception) {
                         exception.printStackTrace();
                         hook.editOriginal("Couldn't create the transcript. Please try again.").queue();

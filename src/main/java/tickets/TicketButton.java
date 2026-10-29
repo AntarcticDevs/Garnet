@@ -18,7 +18,6 @@ import net.dv8tion.jda.api.modals.Modal;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
 import net.dv8tion.jda.api.components.textinput.TextInputStyle;
-import net.dv8tion.jda.api.utils.FileUpload;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -341,15 +340,19 @@ public class TicketButton extends ListenerAdapter {
             if ("transcript".equals(action)) {
                 event.deferReply(true).queue(hook -> {
                     try {
-                        byte[] transcript = new TranscriptManager().createTranscript(channel);
-
-                        hook.sendFiles(FileUpload.fromData(
-                                transcript, channel.getName() + "-transcript.txt"))
-                                .queue(null, error ->
-                                        hook.editOriginal("Couldn't upload the transcript.")
+                        new TranscriptManager().sendTranscript(channel, hook)
+                                .whenComplete((ignored, error) -> {
+                                    if (error != null) {
+                                        System.err.println("Transcript generation failed:");
+                                        error.printStackTrace();
+                                        hook.editOriginal("Couldn't create or upload the transcript.")
                                                 .queue(null, editError ->
                                                         System.err.println(
-                                                                "Failed to send upload error: " + editError)));
+                                                                "Failed to send transcript error message: "
+                                                                        + editError));
+                                        return;
+                                    }
+                                });
                     } catch (RuntimeException exception) {
                         System.err.println("Transcript generation failed:");
                         exception.printStackTrace();

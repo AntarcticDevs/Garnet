@@ -5,47 +5,79 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageHistory;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.interactions.InteractionHook;
+import net.dv8tion.jda.api.utils.FileUpload;
 
 public class TranscriptManager {
-    private static final int MAX_MESSAGES = 1_000;
+    private static final int HISTORY_PAGE_SIZE = 100;
+    private static final String TRANSCRIPT_SUFFIX = "-transcript.txt";
     private static final DateTimeFormatter TIMESTAMP_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z");
 
-    public byte[] createTranscript(TextChannel channel) {
+    public CompletableFuture<Void> sendTranscript(TextChannel channel, InteractionHook hook) {
         List<Message> messages = new ArrayList<>();
-        String beforeId = null;
+        return retrieveMessages(channel, messages, null)
+                .thenCompose(ignored -> {
+                    Collections.reverse(messages);
+                    String transcript = formatTranscript(channel, messages);
+                    List<byte[]> parts = splitTranscript(
+                            transcript, channel.getGuild().getMaxFileSize());
+                    return sendTranscriptPart(channel, hook, parts, 0);
+                });
+    }
 
-        while (messages.size() < MAX_MESSAGES) {
-            int limit = Math.min(100, MAX_MESSAGES - messages.size());
-            List<Message> batch;
-            if (beforeId == null) {
-                batch = channel.getHistory().retrievePast(limit).complete();
-            } else {
-                MessageHistory history = MessageHistory.getHistoryBefore(channel, beforeId)
-                        .limit(limit)
-                        .complete();
-                batch = history.getRetrievedHistory();
-            }
+    private CompletableFuture<Void> sendTranscriptPart(
+            TextChannel channel, InteractionHook hook, List<byte[]> parts, int partIndex) {
+        if (partIndex >= parts.size()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        String fileName = parts.size() == 1
+                ? channel.getName() + TRANSCRIPT_SUFFIX
+                : channel.getName() + "-transcript-part-" + (partIndex + 1)
+                        + "-of-" + parts.size() + ".txt";
+        return hook.sendFiles(FileUpload.fromData(parts.get(partIndex), fileName))
+                .submit()
+                .thenCompose(ignored -> sendTranscriptPart(channel, hook, parts, partIndex + 1));
+    }
+
+    private CompletableFuture<Void> retrieveMessages(
+            TextChannel channel, List<Message> messages, String beforeId) {
+        CompletableFuture<List<Message>> batchFuture;
+        if (beforeId == null) {
+            batchFuture = channel.getHistory().retrievePast(HISTORY_PAGE_SIZE).submit();
+        } else {
+            batchFuture = MessageHistory.getHistoryBefore(channel, beforeId)
+                    .limit(HISTORY_PAGE_SIZE)
+                    .submit()
+                    .thenApply(MessageHistory::getRetrievedHistory);
+        }
+
+        return batchFuture.thenCompose(batch -> {
             if (batch.isEmpty()) {
-                break;
+                return CompletableFuture.completedFuture(null);
             }
 
             messages.addAll(batch);
-            beforeId = batch.get(batch.size() - 1).getId();
-            if (batch.size() < limit) {
-                break;
+            String nextBeforeId = batch.get(batch.size() - 1).getId();
+            if (batch.size() < HISTORY_PAGE_SIZE) {
+                return CompletableFuture.completedFuture(null);
             }
-        }
 
-        Collections.reverse(messages);
+            return retrieveMessages(channel, messages, nextBeforeId);
+        });
+    }
+
+    private String formatTranscript(TextChannel channel, List<Message> messages) {
         StringBuilder transcript = new StringBuilder()
                 .append("Transcript for #").append(channel.getName())
                 .append(" (").append(channel.getId()).append(")\n")
-                .append("Messages are limited to the latest ").append(MAX_MESSAGES).append(".\n\n");
+                .append("All available channel messages are included.\n\n");
 
         for (Message message : messages) {
             transcript.append('[')
@@ -60,6 +92,57 @@ public class TranscriptManager {
             transcript.append('\n');
         }
 
-        return transcript.toString().getBytes(StandardCharsets.UTF_8);
+        return transcript.toString();
+    }
+
+    private List<byte[]> splitTranscript(String transcript, long maxFileSize) {
+        if (maxFileSize <= 0) {
+            throw new IllegalStateException("Discord reported an invalid file upload limit.");
+        }
+
+        List<byte[]> parts = new ArrayList<>();
+        int start = 0;
+        while (start < transcript.length()) {
+            int end = start;
+            int lastNewline = -1;
+            long partSize = 0;
+
+            while (end < transcript.length()) {
+                int codePoint = transcript.codePointAt(end);
+                long codePointSize = utf8Size(codePoint);
+                if (partSize + codePointSize > maxFileSize) {
+                    break;
+                }
+
+                end += Character.charCount(codePoint);
+                partSize += codePointSize;
+                if (codePoint == '\n') {
+                    lastNewline = end;
+                }
+            }
+
+            if (end == start) {
+                throw new IllegalStateException(
+                        "A transcript character exceeds Discord's file upload limit.");
+            }
+            if (end < transcript.length() && lastNewline > start) {
+                end = lastNewline;
+            }
+
+            parts.add(transcript.substring(start, end).getBytes(StandardCharsets.UTF_8));
+            start = end;
+        }
+
+        return parts;
+    }
+
+    private long utf8Size(int codePoint) {
+        if (codePoint <= 0x7F) {
+            return 1;
+        }
+        if (codePoint <= 0x7FF) {
+            return 2;
+        }
+        return codePoint <= 0xFFFF ? 3 : 4;
     }
 }
