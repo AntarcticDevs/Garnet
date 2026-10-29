@@ -6,7 +6,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
+import database.Database;
+import java.sql.SQLException;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.MessageHistory;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -20,6 +24,30 @@ public class TranscriptManager {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss XXX");
 
     public CompletableFuture<Void> sendTranscript(TextChannel channel, InteractionHook hook) {
+        return sendTranscript(channel, upload -> hook.sendFiles(upload).submit());
+    }
+
+    public CompletableFuture<Void> sendTranscript(TextChannel channel, TextChannel destination) {
+        return sendTranscript(channel, upload -> destination.sendFiles(upload).submit());
+    }
+
+    public TextChannel getConfiguredDestination(Guild guild, TicketData ticket) throws SQLException {
+        if (ticket.panelId == null) {
+            return null;
+        }
+        TicketPanelData panel = Database.getPanelDataById(guild.getId(), ticket.panelId);
+        if (panel == null || panel.transcriptChannelId == null || panel.transcriptChannelId.isBlank()) {
+            return null;
+        }
+        TextChannel destination = guild.getTextChannelById(panel.transcriptChannelId);
+        if (destination == null) {
+            throw new IllegalStateException("The configured ticket transcript channel is missing.");
+        }
+        return destination;
+    }
+
+    private CompletableFuture<Void> sendTranscript(
+            TextChannel channel, Function<FileUpload, CompletableFuture<?>> upload) {
         List<Message> messages = new ArrayList<>();
         return retrieveMessages(channel, messages, null)
                 .thenCompose(ignored -> {
@@ -27,12 +55,15 @@ public class TranscriptManager {
                     String transcript = formatTranscript(channel, messages);
                     List<byte[]> parts = splitTranscript(
                             transcript, channel.getGuild().getMaxFileSize());
-                    return sendTranscriptPart(channel, hook, parts, 0);
+                    return sendTranscriptPart(channel, upload, parts, 0);
                 });
     }
 
     private CompletableFuture<Void> sendTranscriptPart(
-            TextChannel channel, InteractionHook hook, List<byte[]> parts, int partIndex) {
+            TextChannel channel,
+            Function<FileUpload, CompletableFuture<?>> upload,
+            List<byte[]> parts,
+            int partIndex) {
         if (partIndex >= parts.size()) {
             return CompletableFuture.completedFuture(null);
         }
@@ -41,9 +72,9 @@ public class TranscriptManager {
                 ? channel.getName() + TRANSCRIPT_SUFFIX
                 : channel.getName() + "-transcript-part-" + (partIndex + 1)
                         + "-of-" + parts.size() + ".txt";
-        return hook.sendFiles(FileUpload.fromData(parts.get(partIndex), fileName))
-                .submit()
-                .thenCompose(ignored -> sendTranscriptPart(channel, hook, parts, partIndex + 1));
+        return upload.apply(FileUpload.fromData(parts.get(partIndex), fileName))
+                .thenApply(ignored -> null)
+                .thenCompose(ignored -> sendTranscriptPart(channel, upload, parts, partIndex + 1));
     }
 
     private CompletableFuture<Void> retrieveMessages(

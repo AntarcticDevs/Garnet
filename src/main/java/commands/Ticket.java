@@ -41,6 +41,12 @@ public class Ticket extends ListenerAdapter implements Command {
                 "The category where new ticket channels will be created",
                 true
         ).setChannelTypes(ChannelType.CATEGORY);
+        OptionData transcriptChannel = new OptionData(
+                OptionType.CHANNEL,
+                "channel",
+                "Where transcripts are sent; omit to send them privately to the requester",
+                false
+        ).setChannelTypes(ChannelType.TEXT);
         OptionData panelName = new OptionData(
                 OptionType.STRING,
                 "name",
@@ -90,7 +96,9 @@ public class Ticket extends ListenerAdapter implements Command {
                         new SubcommandData("staff-roles", "Select staff roles for a ticket panel")
                             .addOptions(panelName),
                         new SubcommandData("ping-roles", "Select ping roles for a ticket panel")
-                            .addOptions(panelName)
+                            .addOptions(panelName),
+                        new SubcommandData("transcript-channel", "Set a transcript channel or clear it")
+                            .addOptions(panelName, transcriptChannel)
                     )
             );
     }
@@ -102,7 +110,8 @@ public class Ticket extends ListenerAdapter implements Command {
                 && ("edit".equals(event.getSubcommandName())
                     || "send".equals(event.getSubcommandName())
                     || "staff-roles".equals(event.getSubcommandName())
-                    || "ping-roles".equals(event.getSubcommandName()))
+                    || "ping-roles".equals(event.getSubcommandName())
+                    || "transcript-channel".equals(event.getSubcommandName()))
                 && "name".equals(event.getFocusedOption().getName());
         if (!panelNameOption) {
             return;
@@ -318,6 +327,51 @@ public class Ticket extends ListenerAdapter implements Command {
             return;
         }
 
+        if ("panel".equals(event.getSubcommandGroup())
+                && "transcript-channel".equals(event.getSubcommandName())) {
+            OptionMapping panelNameOption = event.getOption("name");
+            OptionMapping channelOption = event.getOption("channel");
+            if (panelNameOption == null) {
+                event.reply("Please choose a ticket panel.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+            TextChannel transcriptChannel = channelOption == null
+                    ? null
+                    : channelOption.getAsChannel() instanceof TextChannel textChannel ? textChannel : null;
+            if (channelOption != null && transcriptChannel == null) {
+                event.reply("Please choose a text channel for ticket transcripts.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+            String channelId = transcriptChannel == null ? null : transcriptChannel.getId();
+            try {
+                TicketPanelData panelData = Database.getPanelData(
+                        event.getGuild().getId(), panelNameOption.getAsString());
+                if (panelData == null) {
+                    event.reply("I couldn't find that ticket panel.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
+                Database.savePanelTranscriptChannel(panelData.id, event.getGuild().getId(), channelId);
+                String result = channelOption == null
+                        ? "Ticket transcripts for **" + panelData.name
+                                + "** will be sent privately to the staff member who requests them."
+                        : "Ticket transcripts for **" + panelData.name + "** will be sent to "
+                                + transcriptChannel.getAsMention() + ".";
+                event.reply(result).setEphemeral(true).queue();
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.reply("Couldn't save the transcript channel. Please try again.")
+                        .setEphemeral(true)
+                        .queue();
+            }
+            return;
+        }
+
         if ("set-category".equals(event.getSubcommandName())) {
             OptionMapping categoryOption = event.getOption("category");
             if (categoryOption == null || !(categoryOption.getAsChannel() instanceof Category category)) {
@@ -477,9 +531,23 @@ public class Ticket extends ListenerAdapter implements Command {
                 ));
             }
             case "transcript" -> {
+                TranscriptManager transcripts = new TranscriptManager();
+                TextChannel destination;
+                try {
+                    destination = transcripts.getConfiguredDestination(event.getGuild(), ticket);
+                } catch (SQLException | IllegalStateException exception) {
+                    exception.printStackTrace();
+                    event.reply("Couldn't load the configured transcript channel. Please ask a server moderator to check it.")
+                            .setEphemeral(true)
+                            .queue();
+                    return;
+                }
                 event.deferReply(true).queue(hook -> {
                     try {
-                        new TranscriptManager().sendTranscript(channel, hook)
+                        var upload = destination == null
+                                ? transcripts.sendTranscript(channel, hook)
+                                : transcripts.sendTranscript(channel, destination);
+                        upload
                                 .whenComplete((ignored, error) -> {
                                     if (error != null) {
                                         System.err.println("Transcript generation failed:");
@@ -488,6 +556,10 @@ public class Ticket extends ListenerAdapter implements Command {
                                                         "Couldn't create or upload the transcript. Please try again.")
                                                 .queue();
                                         return;
+                                    }
+                                    if (destination != null) {
+                                        hook.editOriginal("Transcript sent to " + destination.getAsMention() + ".")
+                                                .queue();
                                     }
                                 });
                     } catch (RuntimeException exception) {

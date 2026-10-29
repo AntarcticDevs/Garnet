@@ -17,6 +17,7 @@ public class TicketPanelData {
     public List<String> categories = new ArrayList<>();
 
     public String ticketCategoryId;
+    public String transcriptChannelId;
 
     // Appearance of the published panel message (null = use the default).
     public String embedTitle;

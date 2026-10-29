@@ -45,7 +45,7 @@ Garnet's ticket system is being developed from the ground up with a focus on rel
 - [x] Text transcripts (latest 1,000 messages)
 - [x] Server and panel ticket configuration, including channel categories and staff/ping roles
 
-Use `/ticket panel create`, `/ticket panel edit`, and `/ticket panel send` to publish a panel. In the panel editor, configure comma-separated categories, then use **Category Questions** to give each category up to five required form prompts (one prompt per line). Selecting a category opens that form before creating the ticket. New tickets start with an embed containing the submitted answers and controls; only members with **Manage Channels** can claim, unclaim, transfer, delete, or create a transcript. Ticket creators can close and reopen their ticket.
+Use `/ticket panel create`, `/ticket panel edit`, and `/ticket panel send` to publish a panel. In the panel editor, configure comma-separated categories, then use **Category Questions** to give each category up to five required form prompts (one prompt per line). Selecting a category opens that form before creating the ticket. New tickets start with an embed containing the submitted answers and controls; only members with **Manage Channels** can claim, unclaim, transfer, delete, or create a transcript. Ticket creators can close and reopen their ticket. Use `/ticket panel transcript-channel` with a panel name and optional text channel to configure where that panel's transcripts are uploaded; omit the channel to clear the setting and send transcripts privately to the requester. The ticket's **Transfer** button opens a member picker and only accepts staff configured for that ticket's panel.
 
 ##  Project Structure
 

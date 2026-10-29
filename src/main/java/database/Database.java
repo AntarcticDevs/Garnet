@@ -101,6 +101,7 @@ public class Database {
             addColumnIfMissing(connection, "ticket_panels", "total_staff_roles INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "total_ping_roles INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "ticket_category_id TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "transcript_channel_id TEXT");
 
             addColumnIfMissing(connection, "ticket_panels", "embed_title TEXT");
             addColumnIfMissing(connection, "ticket_panels", "embed_colour TEXT");
@@ -432,11 +433,12 @@ public class Database {
                         ? "UPDATE ticket_panels SET content = ?, ticket_category_id = ?, embed_title = ?, "
                                 + "embed_colour = ?, image_url = ?, thumbnail_url = ?, footer_text = ?, "
                                 + "button_label = ?, button_emoji = ?, button_style = ?, channel_id = ?, "
+                                + "transcript_channel_id = ?, "
                                 + "message_id = ? WHERE id = ?"
                         : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id, embed_title, "
                                 + "embed_colour, image_url, thumbnail_url, footer_text, button_label, "
-                                + "button_emoji, button_style, channel_id, message_id) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                + "button_emoji, button_style, channel_id, transcript_channel_id, message_id) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                     int next = 1;
@@ -455,6 +457,7 @@ public class Database {
                     statement.setString(next++, panel.buttonEmoji);
                     statement.setString(next++, panel.buttonStyle);
                     statement.setString(next++, panel.channelId);
+                    statement.setString(next++, panel.transcriptChannelId);
                     statement.setString(next++, panel.messageId);
                     if (panelExists) {
                         statement.setInt(next, panel.id);
@@ -578,6 +581,7 @@ public class Database {
         panelData.name = resultSet.getString("name");
         panelData.content = resultSet.getString("content");
         panelData.ticketCategoryId = resultSet.getString("ticket_category_id");
+        panelData.transcriptChannelId = resultSet.getString("transcript_channel_id");
         panelData.embedTitle = resultSet.getString("embed_title");
         panelData.embedColour = resultSet.getString("embed_colour");
         panelData.imageUrl = resultSet.getString("image_url");
@@ -633,6 +637,20 @@ public class Database {
             statement.setString(2, messageId);
             statement.setInt(3, panelId);
             statement.executeUpdate();
+        }
+    }
+
+    public static void savePanelTranscriptChannel(int panelId, String guildId, String channelId)
+            throws SQLException {
+        String sql = "UPDATE ticket_panels SET transcript_channel_id = ? WHERE id = ? AND guild_id = ?";
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, channelId);
+            statement.setInt(2, panelId);
+            statement.setString(3, guildId);
+            if (statement.executeUpdate() == 0) {
+                throw new SQLException("Ticket panel was not found while saving its transcript channel.");
+            }
         }
     }
 
