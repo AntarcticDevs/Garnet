@@ -317,20 +317,24 @@ public class TicketButton extends ListenerAdapter {
                         .addComponents(Label.of("Staff member", target)).build()).queue();
                 return;
             }
+
             if ("delete".equals(action)) {
                 event.deferReply(true).queue(hook -> channel.delete().queue(
-                        ignored -> {
-                            try {
-                                Database.deleteTicketByChannelId(channel.getId());
-                                hook.editOriginal("Ticket deleted.").queue();
-                            } catch (SQLException exception) {
-                                exception.printStackTrace();
-                                hook.editOriginal("Channel deleted, but its ticket record could not be removed.")
-                                        .queue();
-                            }
-                        },
-                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
-                                .queue()));
+                    ignored -> {
+                        try {
+                            Database.deleteTicketByChannelId(channel.getId());
+                            System.out.println("Ticket deleted successfully.");
+                        } catch (SQLException exception) {
+                            System.err.println(
+                                "Channel deleted, but ticket record removal failed."
+                            );
+                            exception.printStackTrace();
+                        }
+                    },
+                    error -> hook.editOriginal(
+                        "Couldn't delete the ticket channel. Check my permissions."
+                    ).queue()
+                ));
                 return;
             }
 
