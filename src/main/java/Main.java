@@ -17,6 +17,7 @@ import tickets.TicketButton;
 import tickets.TicketPanelEditor;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
+import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 
 import java.util.List;
@@ -35,17 +36,25 @@ public class Main {
 
         public static void main(String[] args) throws InterruptedException {
         try {
-            ConfigManager.createIfMissing();
+            boolean created = ConfigManager.createIfMissing();
             ConfigManager.load();
+            if (created) {
+                ConsoleLogger.logConsole("config.yml was created. Open it, add your bot token, then start the bot again.");
+                System.exit(1);
+                return;
+            }
         } catch (IOException e) {
-            e.printStackTrace();
+            ConsoleLogger.logConsole("Couldn't read config.yml: " + e.getMessage());
+            System.exit(1);
             return;
         }
 
         String token = ConfigManager.getString("token");
 
-        if (token == null || token.isBlank()) {
-            throw new IllegalStateException("token in config.yml is not set");
+        if (token == null) {
+            ConsoleLogger.logConsole("No bot token is set. Open config.yml, fill in token, then start the bot again.");
+            System.exit(1);
+            return;
         }
 
         try {
@@ -54,30 +63,48 @@ public class Main {
             e.printStackTrace();
         }
 
-        JDA jda = JDABuilder.createDefault(token)
-                .enableIntents(GatewayIntent.GUILD_MEMBERS)
-                .addEventListeners(
-                        new Info(),
-                        new UserInfo(),
-                        new Avatar(),
-                        new Embeds(),
-                        new Ping(),
-                        new Help(),
-                        new Rules(),
-                        new Ticket(),
-                        new Purge(),
-                        new Ban(),
-                        new Kick(),
-                        // new ComponentsTest(),
-                        new TicketButton(),
-                        new TicketPanelEditor(),
-                        new ConsoleActivityLogger()
-                )
-                .addEventListeners(
-                        new WelcomeListener()
-                )
-                .build()
-                .awaitReady();
+        JDA jda;
+        try {
+            jda = JDABuilder.createDefault(token)
+                    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+                    .addEventListeners(
+                            new Info(),
+                            new UserInfo(),
+                            new Avatar(),
+                            new Embeds(),
+                            new Ping(),
+                            new Help(),
+                            new Rules(),
+                            new Ticket(),
+                            new Purge(),
+                            new Ban(),
+                            new Kick(),
+                            // new ComponentsTest(),
+                            new TicketButton(),
+                            new TicketPanelEditor(),
+                            new ConsoleActivityLogger()
+                    )
+                    .addEventListeners(
+                            new WelcomeListener()
+                    )
+                    .build()
+                    .awaitReady();
+        } catch (InvalidTokenException e) {
+            ConsoleLogger.logConsole("Discord rejected the bot token. Check the token in config.yml "
+                    + "(copy it again from the Bot tab of your application) and start the bot again.");
+            System.exit(1);
+            return;
+        } catch (IllegalStateException e) {
+            String reason = String.valueOf(e.getMessage());
+            ConsoleLogger.logConsole("Couldn't connect to Discord: " + reason.replace("\n", " "));
+            if (reason.toLowerCase(java.util.Locale.ROOT).contains("intent")) {
+                ConsoleLogger.logConsole("Turn on \"Server Members Intent\" under Privileged Gateway Intents "
+                        + "on the Bot tab of your application at https://discord.com/developers/applications, "
+                        + "then start the bot again.");
+            }
+            System.exit(1);
+            return;
+        }
 
         System.out.println("""
                    █████████                                           █████

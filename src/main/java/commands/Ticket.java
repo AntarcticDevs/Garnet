@@ -517,13 +517,13 @@ public class Ticket extends ListenerAdapter implements Command {
             case "delete" -> {
                 event.deferReply(true).queue(hook -> channel.delete().queue(
                         ignored -> {
+                            // The reply to this command lives in the channel that was just deleted,
+                            // so it can't be edited anymore (Discord answers 10008 Unknown Message).
                             try {
                                 Database.deleteTicketByChannelId(channel.getId());
-                                hook.editOriginal("Ticket deleted.").queue();
                             } catch (SQLException exception) {
+                                System.err.println("Channel deleted, but ticket record removal failed.");
                                 exception.printStackTrace();
-                                hook.editOriginal("The channel was deleted, but the ticket record couldn't be removed.")
-                                        .queue();
                             }
                         },
                         error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")

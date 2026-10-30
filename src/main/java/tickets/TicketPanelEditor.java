@@ -257,6 +257,21 @@ public class TicketPanelEditor extends ListenerAdapter {
             channel.setDefaultValues(EntitySelectMenu.DefaultValue.channel(panel.channelId));
         }
         children.add(ActionRow.of(channel.build()));
+
+        children.add(TextDisplay.of("**Transcript channel**\n"
+                + (panel.transcriptChannelId == null
+                        ? "*none: transcripts are sent privately to whoever requests them*"
+                        : "<#" + panel.transcriptChannelId + ">")
+                + "\n-# Where ticket transcripts are posted."));
+        EntitySelectMenu.Builder transcript = EntitySelectMenu.create(
+                        id(panel, page, "transcript"), EntitySelectMenu.SelectTarget.CHANNEL)
+                .setChannelTypes(ChannelType.TEXT)
+                .setPlaceholder("Select the transcript channel")
+                .setRequiredRange(0, 1);
+        if (panel.transcriptChannelId != null && guild.getTextChannelById(panel.transcriptChannelId) != null) {
+            transcript.setDefaultValues(EntitySelectMenu.DefaultValue.channel(panel.transcriptChannelId));
+        }
+        children.add(ActionRow.of(transcript.build()));
     }
 
     private EntitySelectMenu roleMenu(
@@ -775,6 +790,15 @@ public class TicketPanelEditor extends ListenerAdapter {
                 saveAndRefresh(event, ctx, moved
                         ? "✅ Saved. The old panel message was removed. Press **Publish** to post it here."
                         : "✅ Saved.");
+            }
+            case "transcript" -> {
+                panel.transcriptChannelId = values.stream()
+                        .filter(TextChannel.class::isInstance)
+                        .map(TextChannel.class::cast)
+                        .map(TextChannel::getId)
+                        .findFirst()
+                        .orElse(null);
+                saveAndRefresh(event, ctx, "✅ Saved.");
             }
             default -> deny(event, "That editor control isn't available.");
         }
