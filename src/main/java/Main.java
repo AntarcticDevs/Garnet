@@ -1,20 +1,8 @@
 import config.ConfigManager;
-import commands.Info;
-import commands.UserInfo;
-import commands.Avatar;
-import commands.Embeds;
-import commands.Ping;
 import commands.Help;
-import commands.Rules;
-import commands.Ticket;
-import commands.Purge;
-import commands.Ban;
-import commands.Kick;
-
-import events.WelcomeListener;
 import events.ConsoleActivityLogger;
-import tickets.TicketButton;
-import tickets.TicketPanelEditor;
+import modules.BotModule;
+
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.exceptions.InvalidTokenException;
@@ -24,6 +12,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 import commands.Command;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 
 import database.Database;
@@ -63,30 +52,39 @@ public class Main {
             e.printStackTrace();
         }
 
+        // Help and the activity logger are always on; every other feature is a module that can be
+        // switched off in config.yml. Each listener that is also a Command adds its slash command.
+        List<ListenerAdapter> listeners = new ArrayList<>();
+        List<CommandData> commandData = new ArrayList<>();
+        Help help = new Help();
+        listeners.add(help);
+        commandData.add(help.getCommandData());
+        listeners.add(new ConsoleActivityLogger());
+
+        for (String warning : BotModule.configWarnings()) {
+            ConsoleLogger.logConsole("WARNING " + warning);
+        }
+        List<String> enabledModules = new ArrayList<>();
+        List<String> disabledModules = new ArrayList<>();
+        for (BotModule module : BotModule.values()) {
+            if (!module.isEnabled()) {
+                disabledModules.add(module.key());
+                continue;
+            }
+            enabledModules.add(module.key());
+            for (ListenerAdapter listener : module.create()) {
+                listeners.add(listener);
+                if (listener instanceof Command command) {
+                    commandData.add(command.getCommandData());
+                }
+            }
+        }
+
         JDA jda;
         try {
             jda = JDABuilder.createDefault(token)
                     .enableIntents(GatewayIntent.GUILD_MEMBERS)
-                    .addEventListeners(
-                            new Info(),
-                            new UserInfo(),
-                            new Avatar(),
-                            new Embeds(),
-                            new Ping(),
-                            new Help(),
-                            new Rules(),
-                            new Ticket(),
-                            new Purge(),
-                            new Ban(),
-                            new Kick(),
-                            // new ComponentsTest(),
-                            new TicketButton(),
-                            new TicketPanelEditor(),
-                            new ConsoleActivityLogger()
-                    )
-                    .addEventListeners(
-                            new WelcomeListener()
-                    )
+                    .addEventListeners(listeners.toArray())
                     .build()
                     .awaitReady();
         } catch (InvalidTokenException e) {
@@ -119,27 +117,8 @@ public class Main {
         ConsoleLogger.logConsole("-----------------------𝐁𝐨𝐭 𝐦𝐚𝐝𝐞 𝐛𝐲 𝐄𝐧𝐝𝐞𝐫𝐊𝐧𝐢𝐠𝐡𝐭𝟕𝐨𝐩-----------------------");
         ConsoleLogger.logConsole("✅ " + ConfigManager.getBotName() + " is online!");
 
-        List<Command> commands = List.<Command>of(
-                new Info(),
-                new UserInfo(),
-                new Avatar(),
-                new Embeds(),
-                new Ping(),
-                new Help(),
-                new Rules(),
-                new Ticket(),
-                new Purge(),
-                new Ban(),
-                new Kick(),
-                // new ComponentsTest(),
-                new WelcomeListener()
-        );
-
-        List<CommandData> commandData = new ArrayList<>();
-
-        for (Command command : commands) {
-            commandData.add(command.getCommandData());
-        }
+        ConsoleLogger.logConsole("Features on: " + (enabledModules.isEmpty() ? "none" : String.join(", ", enabledModules))
+                + (disabledModules.isEmpty() ? "" : " | off: " + String.join(", ", disabledModules)));
 
         jda.updateCommands()
                 .addCommands(commandData)

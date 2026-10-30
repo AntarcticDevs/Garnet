@@ -1,6 +1,7 @@
 package commands;
 
 import config.ConfigManager;
+import modules.BotModule;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
@@ -64,10 +65,17 @@ public class Help extends ListenerAdapter implements Command {
         List<ContainerChildComponent> children = new ArrayList<>();
         children.add(headingComponent);
         children.add(Separator.createDivider(Separator.Spacing.LARGE));
-        children.add(information);
-        children.add(moderation);
+        // Only list commands that are actually registered (see modules: in config.yml).
+        if (BotModule.INFORMATION.isEnabled()) {
+            children.add(information);
+        }
+        if (BotModule.MODERATION.isEnabled()) {
+            children.add(moderation);
+        }
         children.add(fun);
-        children.add(utility);
+        if (BotModule.EMBEDS.isEnabled()) {
+            children.add(utility);
+        }
 
         List<Button> linkButtons = new ArrayList<>();
         addLinkButton(linkButtons, "support-url", "Support Server");
