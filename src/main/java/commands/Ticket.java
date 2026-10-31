@@ -453,6 +453,7 @@ public class Ticket extends ListenerAdapter implements Command {
                     manager.closeTicket(event.getGuild(), channel.getId(), ticket.creatorId,
                             new EmbedBuilder().setTitle("Ticket closed")
                                     .setDescription("Closed by " + event.getUser().getAsMention() + "."));
+                    new TranscriptManager().sendOnClose(channel, ticket);
                     event.reply("Ticket closed.").setEphemeral(true).queue();
                 } catch (SQLException exception) {
                     exception.printStackTrace();
@@ -515,8 +516,8 @@ public class Ticket extends ListenerAdapter implements Command {
                 replyTicketResult(event, result, "Ticket transferred to " + assignee.getAsMention() + ".");
             }
             case "delete" -> {
-                event.deferReply(true).queue(hook -> channel.delete().queue(
-                        ignored -> {
+                event.deferReply(true).queue(hook -> new TranscriptManager().sendThenDelete(
+                        channel, ticket, hook, () -> {
                             // The reply to this command lives in the channel that was just deleted,
                             // so it can't be edited anymore (Discord answers 10008 Unknown Message).
                             try {
@@ -525,10 +526,7 @@ public class Ticket extends ListenerAdapter implements Command {
                                 System.err.println("Channel deleted, but ticket record removal failed.");
                                 exception.printStackTrace();
                             }
-                        },
-                        error -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
-                                .queue()
-                ));
+                        }));
             }
             case "transcript" -> {
                 TranscriptManager transcripts = new TranscriptManager();
