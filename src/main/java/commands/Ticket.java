@@ -65,6 +65,18 @@ public class Ticket extends ListenerAdapter implements Command {
                 "The saved panel to send (leave empty for the default panel)",
                 false
         ).setAutoComplete(true);
+        OptionData disabledPanelName = new OptionData(
+                OptionType.STRING,
+                "name",
+                "The ticket panel",
+                true
+        ).setAutoComplete(true);
+        OptionData disabledMessage = new OptionData(
+                OptionType.STRING,
+                "message",
+                "What the panel says while disabled (leave empty for the default message)",
+                false
+        ).setMaxLength(1000);
         OptionData transferMember = new OptionData(
                 OptionType.USER,
                 "member",
@@ -97,6 +109,10 @@ public class Ticket extends ListenerAdapter implements Command {
                             .addOptions(panelName),
                         new SubcommandData("ping-roles", "Select ping roles for a ticket panel")
                             .addOptions(panelName),
+                        new SubcommandData("disable", "Replace a panel's button or menu with a disabled notice")
+                            .addOptions(disabledPanelName, disabledMessage),
+                        new SubcommandData("enable", "Turn a disabled ticket panel back on")
+                            .addOptions(disabledPanelName),
                         new SubcommandData("transcript-channel", "Set a transcript channel or clear it")
                             .addOptions(panelName, transcriptChannel)
                     )
@@ -111,6 +127,8 @@ public class Ticket extends ListenerAdapter implements Command {
                     || "send".equals(event.getSubcommandName())
                     || "staff-roles".equals(event.getSubcommandName())
                     || "ping-roles".equals(event.getSubcommandName())
+                    || "disable".equals(event.getSubcommandName())
+                    || "enable".equals(event.getSubcommandName())
                     || "transcript-channel".equals(event.getSubcommandName()))
                 && "name".equals(event.getFocusedOption().getName());
         if (!panelNameOption) {
@@ -328,6 +346,60 @@ public class Ticket extends ListenerAdapter implements Command {
         }
 
         if ("panel".equals(event.getSubcommandGroup())
+                && ("disable".equals(event.getSubcommandName())
+                    || "enable".equals(event.getSubcommandName()))) {
+            boolean disabling = "disable".equals(event.getSubcommandName());
+            OptionMapping toggleName = event.getOption("name");
+            if (toggleName == null) {
+                event.reply("Please choose a ticket panel.").setEphemeral(true).queue();
+                return;
+            }
+            try {
+                TicketPanelData panelData = Database.getPanelData(
+                        event.getGuild().getId(), toggleName.getAsString());
+                if (panelData == null) {
+                    event.reply("I couldn't find that ticket panel.").setEphemeral(true).queue();
+                    return;
+                }
+                OptionMapping messageOption = disabling ? event.getOption("message") : null;
+                panelData.disabled = disabling;
+                panelData.disabledMessage = messageOption == null || messageOption.getAsString().isBlank()
+                        ? null
+                        : messageOption.getAsString().trim();
+                Database.savePanel(panelData);
+
+                String state = disabling ? "disabled" : "enabled";
+                TextChannel published = panelData.channelId == null || panelData.messageId == null
+                        ? null
+                        : event.getGuild().getTextChannelById(panelData.channelId);
+                if (published == null) {
+                    event.reply("Ticket panel **" + panelData.name + "** is now " + state
+                                    + ". It isn't posted in a channel yet; it will look like this when you publish it.")
+                            .setEphemeral(true).queue();
+                    return;
+                }
+                TicketPanel renderer = new TicketPanel();
+                event.deferReply(true).queue(hook -> published
+                        .editMessageEmbedsById(panelData.messageId,
+                                renderer.buildEmbed(panelData, event.getGuild()))
+                        .setComponents(renderer.buildActionRow(panelData))
+                        .queue(
+                                message -> hook.editOriginal("Ticket panel **" + panelData.name + "** is now "
+                                        + state + " in " + published.getAsMention() + ".").queue(),
+                                error -> hook.editOriginal("Ticket panel **" + panelData.name + "** is now "
+                                        + state + ", but I couldn't update the message in "
+                                        + published.getAsMention() + ". It may have been deleted, or I can't "
+                                        + "edit it; publish the panel again from the editor.").queue()));
+            } catch (SQLException exception) {
+                exception.printStackTrace();
+                event.reply("Couldn't update that ticket panel. Please try again.")
+                        .setEphemeral(true)
+                        .queue();
+            }
+            return;
+        }
+
+        if ("panel".equals(event.getSubcommandGroup())
                 && "transcript-channel".equals(event.getSubcommandName())) {
             OptionMapping panelNameOption = event.getOption("name");
             OptionMapping channelOption = event.getOption("channel");
@@ -529,34 +601,17 @@ public class Ticket extends ListenerAdapter implements Command {
                         }));
             }
             case "transcript" -> {
-                TranscriptManager transcripts = new TranscriptManager();
-                TextChannel destination;
-                try {
-                    destination = transcripts.getConfiguredDestination(event.getGuild(), ticket);
-                } catch (SQLException | IllegalStateException exception) {
-                    exception.printStackTrace();
-                    event.reply("Couldn't load the configured transcript channel. Please ask a server moderator to check it.")
-                            .setEphemeral(true)
-                            .queue();
-                    return;
-                }
+                // A requested transcript is private: posted ephemerally here. Close and delete
+                // are what send it to the panel's transcript channel.
                 event.deferReply(true).queue(hook -> {
                     try {
-                        var upload = destination == null
-                                ? transcripts.sendTranscript(channel, hook)
-                                : transcripts.sendTranscript(channel, destination);
-                        upload
+                        new TranscriptManager().sendTranscript(channel, hook)
                                 .whenComplete((ignored, error) -> {
                                     if (error != null) {
                                         System.err.println("Transcript generation failed:");
                                         error.printStackTrace();
                                         hook.editOriginal(
                                                         "Couldn't create or upload the transcript. Please try again.")
-                                                .queue();
-                                        return;
-                                    }
-                                    if (destination != null) {
-                                        hook.editOriginal("Transcript sent to " + destination.getAsMention() + ".")
                                                 .queue();
                                     }
                                 });

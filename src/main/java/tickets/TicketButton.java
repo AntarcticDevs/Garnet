@@ -144,6 +144,10 @@ public class TicketButton extends ListenerAdapter {
                         .queue();
                 return;
             }
+            if (panelData.disabled) {
+                event.reply(disabledText(panelData)).setEphemeral(true).queue();
+                return;
+            }
             String categoryName = event.getValues().get(0);
             event.getMessage().editMessageComponents(ActionRow.of(TicketPanel.categoryMenu(panelData))).queue();
             List<TicketQuestion> questions = Database.getPanelQuestions(panelId, categoryName);
@@ -185,6 +189,12 @@ public class TicketButton extends ListenerAdapter {
         }
     }
 
+    private static String disabledText(TicketPanelData panelData) {
+        return panelData.disabledMessage == null || panelData.disabledMessage.isBlank()
+                ? TicketPanel.DEFAULT_DISABLED_MESSAGE
+                : panelData.disabledMessage;
+    }
+
     private void createTicket(ButtonInteractionEvent event, Integer panelId, String categoryName) {
         event.deferReply(true).queue(hook -> {
             try {
@@ -193,6 +203,10 @@ public class TicketButton extends ListenerAdapter {
                         : Database.getPanelDataById(event.getGuild().getId(), panelId);
                 if (panelId != null && panelData == null) {
                     hook.editOriginal("That ticket panel no longer exists.").queue();
+                    return;
+                }
+                if (panelData != null && panelData.disabled) {
+                    hook.editOriginal(disabledText(panelData)).queue();
                     return;
                 }
                 createTicket(event.getGuild(), event.getMember(), panelData, categoryName, List.of(),
@@ -328,6 +342,10 @@ public class TicketButton extends ListenerAdapter {
                 event.reply("This ticket panel or category is no longer available.").setEphemeral(true).queue();
                 return;
             }
+            if (panelData.disabled) {
+                event.reply(disabledText(panelData)).setEphemeral(true).queue();
+                return;
+            }
             String categoryName = panelData.categories.get(categoryIndex);
             List<TicketQuestion> questions = Database.getPanelQuestions(panelId, categoryName);
             List<String> prompts = new ArrayList<>();
@@ -404,22 +422,11 @@ public class TicketButton extends ListenerAdapter {
             }
 
             if ("transcript".equals(action)) {
-                TranscriptManager transcripts = new TranscriptManager();
-                TextChannel destination;
-                try {
-                    destination = transcripts.getConfiguredDestination(event.getGuild(), ticket);
-                } catch (IllegalStateException exception) {
-                    event.reply("The configured transcript channel is missing. Please ask a server moderator to update it.")
-                            .setEphemeral(true)
-                            .queue();
-                    return;
-                }
+                // A requested transcript is private: posted ephemerally here. Close and delete
+                // are what send it to the panel's transcript channel.
                 event.deferReply(true).queue(hook -> {
                     try {
-                        var upload = destination == null
-                                ? transcripts.sendTranscript(channel, hook)
-                                : transcripts.sendTranscript(channel, destination);
-                        upload
+                        new TranscriptManager().sendTranscript(channel, hook)
                                 .whenComplete((ignored, error) -> {
                                     if (error != null) {
                                         System.err.println("Transcript generation failed:");
@@ -429,17 +436,11 @@ public class TicketButton extends ListenerAdapter {
                                                         System.err.println(
                                                                 "Failed to send transcript error message: "
                                                                         + editError));
-                                        return;
-                                    }
-                                    if (destination != null) {
-                                        hook.editOriginal("Transcript sent to " + destination.getAsMention() + ".")
-                                                .queue();
                                     }
                                 });
                     } catch (RuntimeException exception) {
                         System.err.println("Transcript generation failed:");
                         exception.printStackTrace();
-
                         hook.editOriginal("Couldn't create the transcript.")
                                 .queue(null, error ->
                                         System.err.println(
