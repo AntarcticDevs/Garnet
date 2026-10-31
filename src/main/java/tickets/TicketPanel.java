@@ -21,6 +21,8 @@ import utils.EmbedHelpers;
 
 public class TicketPanel {
     public static final int DEFAULT_COLOUR = 0x5865F2;
+    public static final String DEFAULT_DISABLED_MESSAGE =
+            "This ticket panel is currently disabled. Please check back later.";
 
     /** Sends the panel as a new message. */
     public RestAction<Message> panel(TicketPanelData panelData, TextChannel channel) {
@@ -48,7 +50,11 @@ public class TicketPanel {
     public MessageEmbed buildEmbed(TicketPanelData panelData, Guild guild) {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(blankToNull(panelData.embedTitle) == null ? panelData.name : panelData.embedTitle)
-                .setDescription(blankToNull(panelData.content) == null
+                .setDescription(panelData.disabled
+                        ? (blankToNull(panelData.disabledMessage) == null
+                                ? DEFAULT_DISABLED_MESSAGE
+                                : panelData.disabledMessage)
+                        : blankToNull(panelData.content) == null
                         ? "Use the button below to create a ticket."
                         : panelData.content)
                 .setColor(parseColour(panelData.embedColour));
@@ -69,6 +75,11 @@ public class TicketPanel {
 
     /** The category dropdown when the panel has categories, otherwise the create button. */
     public ActionRow buildActionRow(TicketPanelData panelData) {
+        if (panelData.disabled) {
+            return ActionRow.of(Button.secondary("ticket:disabled:" + panelData.id, "Tickets disabled")
+                    .withEmoji(Emoji.fromUnicode("\uD83D\uDD12"))
+                    .asDisabled());
+        }
         if (!panelData.categories.isEmpty()) {
             return ActionRow.of(categoryMenu(panelData));
         }

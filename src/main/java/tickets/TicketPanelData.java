@@ -33,6 +33,10 @@ public class TicketPanelData {
     public String channelId;
     public String messageId;
 
+    // When disabled, the published panel shows a disabled button instead of the menu/button.
+    public boolean disabled;
+    public String disabledMessage;
+
     public int totalCategories;
     public int totalStaffRoles;
     public int totalPingRoles;

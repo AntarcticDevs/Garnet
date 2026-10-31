@@ -113,6 +113,8 @@ public class Database {
             addColumnIfMissing(connection, "ticket_panels", "button_style TEXT");
             addColumnIfMissing(connection, "ticket_panels", "channel_id TEXT");
             addColumnIfMissing(connection, "ticket_panels", "message_id TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "disabled INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(connection, "ticket_panels", "disabled_message TEXT");
 
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panel_categories (
@@ -434,11 +436,12 @@ public class Database {
                                 + "embed_colour = ?, image_url = ?, thumbnail_url = ?, footer_text = ?, "
                                 + "button_label = ?, button_emoji = ?, button_style = ?, channel_id = ?, "
                                 + "transcript_channel_id = ?, "
-                                + "message_id = ? WHERE id = ?"
+                                + "message_id = ?, disabled = ?, disabled_message = ? WHERE id = ?"
                         : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id, embed_title, "
                                 + "embed_colour, image_url, thumbnail_url, footer_text, button_label, "
-                                + "button_emoji, button_style, channel_id, transcript_channel_id, message_id) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                + "button_emoji, button_style, channel_id, transcript_channel_id, message_id, "
+                                + "disabled, disabled_message) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                     int next = 1;
@@ -459,6 +462,8 @@ public class Database {
                     statement.setString(next++, panel.channelId);
                     statement.setString(next++, panel.transcriptChannelId);
                     statement.setString(next++, panel.messageId);
+                    statement.setInt(next++, panel.disabled ? 1 : 0);
+                    statement.setString(next++, panel.disabledMessage);
                     if (panelExists) {
                         statement.setInt(next, panel.id);
                     }
@@ -592,6 +597,8 @@ public class Database {
         panelData.buttonStyle = resultSet.getString("button_style");
         panelData.channelId = resultSet.getString("channel_id");
         panelData.messageId = resultSet.getString("message_id");
+        panelData.disabled = resultSet.getInt("disabled") != 0;
+        panelData.disabledMessage = resultSet.getString("disabled_message");
 
         panelData.categories = loadPanelValues(connection, panelData.id, "ticket_panel_categories", "category_name");
         panelData.staffRoles = loadPanelValues(connection, panelData.id, "ticket_panel_staff_roles", "role_id");
