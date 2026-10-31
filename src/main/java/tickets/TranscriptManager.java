@@ -46,6 +46,56 @@ public class TranscriptManager {
         return destination;
     }
 
+    /**
+     * Posts the transcript to the panel's transcript channel, if one is set. Does nothing (and
+     * completes normally) when the panel has no transcript channel. Fails when the channel is gone
+     * or the upload fails.
+     */
+    public CompletableFuture<Void> sendToPanelChannel(TextChannel channel, TicketData ticket) {
+        TextChannel destination;
+        try {
+            destination = getConfiguredDestination(channel.getGuild(), ticket);
+        } catch (SQLException | IllegalStateException exception) {
+            return CompletableFuture.failedFuture(exception);
+        }
+        if (destination == null) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return sendTranscript(channel, destination);
+    }
+
+    /** Close: send the transcript in the background; a failure is logged and never blocks closing. */
+    public void sendOnClose(TextChannel channel, TicketData ticket) {
+        sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {
+            if (error != null) {
+                System.err.println("Couldn't send the transcript for a closed ticket:");
+                error.printStackTrace();
+            }
+        });
+    }
+
+    /**
+     * Delete: the transcript is sent first, and the channel is only deleted once it went through,
+     * because deleting loses the conversation. If it fails, the ticket is kept and the user is told.
+     */
+    public void sendThenDelete(TextChannel channel, TicketData ticket, InteractionHook hook,
+                               Runnable afterDeleted) {
+        sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {
+            if (error != null) {
+                System.err.println("Transcript failed, ticket not deleted:");
+                error.printStackTrace();
+                hook.editOriginal("Couldn't send the transcript to the transcript channel, so the ticket "
+                        + "was **not** deleted. Check my permissions there (or clear the channel), then try again.")
+                        .queue(null, editError -> { });
+                return;
+            }
+            channel.delete().queue(
+                    deleted -> afterDeleted.run(),
+                    deleteError -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
+                            .queue(null, editError -> { }));
+        });
+    }
+
     private CompletableFuture<Void> sendTranscript(
             TextChannel channel, Function<FileUpload, CompletableFuture<?>> upload) {
         List<Message> messages = new ArrayList<>();
