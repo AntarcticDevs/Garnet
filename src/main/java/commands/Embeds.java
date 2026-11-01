@@ -253,7 +253,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
 
 
-    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) {
+    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) { // USE null FOR THE SECOND PARAMETER TO JUST REPLY TO USER MY FUTURE SELFF
         if (event.getGuild() == null) {
             event.reply("This command can only be used in a server.")
                     .setEphemeral(true)
