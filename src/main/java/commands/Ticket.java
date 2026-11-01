@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import database.Database;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
@@ -156,7 +157,7 @@ public class Ticket extends ListenerAdapter implements Command {
                 event.replyChoices(choices).queue();
             }
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Ticket.onCommandAutoCompleteInteraction failed", exception);
             event.replyChoices(List.of()).queue();
         }
     }
@@ -212,7 +213,7 @@ public class Ticket extends ListenerAdapter implements Command {
                         .setEphemeral(true)
                         .queue();
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't create that ticket panel. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -264,7 +265,7 @@ public class Ticket extends ListenerAdapter implements Command {
                                     try {
                                         Database.savePanelMessage(panelData.id, channel.getId(), message.getId());
                                     } catch (SQLException exception) {
-                                        exception.printStackTrace();
+                                        Log.error("Ticket.onSlashCommandInteraction failed", exception);
                                     }
                                     hook.sendMessage("Ticket panel **" + panelData.name + "** sent to " + channel.getAsMention() + ".").queue();
                                 },
@@ -273,7 +274,7 @@ public class Ticket extends ListenerAdapter implements Command {
                         )
                 );
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't load that ticket panel. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -306,7 +307,7 @@ public class Ticket extends ListenerAdapter implements Command {
 
                 new TicketPanelEditor().open(event, panelData);
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't load the ticket panel settings. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -337,7 +338,7 @@ public class Ticket extends ListenerAdapter implements Command {
                 }
                 new TicketPanelEditor().open(event, panelData, TicketPanelEditor.Page.ROUTING);
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't load the ticket panel settings. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -391,7 +392,7 @@ public class Ticket extends ListenerAdapter implements Command {
                                         + published.getAsMention() + ". It may have been deleted, or I can't "
                                         + "edit it; publish the panel again from the editor.").queue()));
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't update that ticket panel. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -436,7 +437,7 @@ public class Ticket extends ListenerAdapter implements Command {
                                 + transcriptChannel.getAsMention() + ".";
                 event.reply(result).setEphemeral(true).queue();
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't save the transcript channel. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -459,7 +460,7 @@ public class Ticket extends ListenerAdapter implements Command {
                         .setEphemeral(true)
                         .queue();
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("Ticket.onSlashCommandInteraction failed", exception);
                 event.reply("Couldn't save the ticket category. Please try again.")
                         .setEphemeral(true)
                         .queue();
@@ -482,7 +483,7 @@ public class Ticket extends ListenerAdapter implements Command {
         try {
             ticket = Database.getTicketByChannelId(channel.getId());
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Ticket.handleTicketAction failed", exception);
             event.reply("Couldn't load this ticket. Please try again.")
                     .setEphemeral(true)
                     .queue();
@@ -507,7 +508,7 @@ public class Ticket extends ListenerAdapter implements Command {
                 return;
             }
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Ticket.replyDenied failed", exception);
             event.reply("Couldn't load this ticket's staff settings. Please try again.")
                     .setEphemeral(true)
                     .queue();
@@ -528,7 +529,7 @@ public class Ticket extends ListenerAdapter implements Command {
                     new TranscriptManager().sendOnClose(channel, ticket);
                     event.reply("Ticket closed.").setEphemeral(true).queue();
                 } catch (SQLException exception) {
-                    exception.printStackTrace();
+                    Log.error("Ticket.replyDenied failed", exception);
                     replyDatabaseError(event);
                 }
             }
@@ -543,7 +544,7 @@ public class Ticket extends ListenerAdapter implements Command {
                                     .setDescription("Reopened by " + event.getUser().getAsMention() + "."));
                     event.reply("Ticket reopened.").setEphemeral(true).queue();
                 } catch (SQLException exception) {
-                    exception.printStackTrace();
+                    Log.error("Ticket.replyDatabaseError failed", exception);
                     replyDatabaseError(event);
                 }
             }
@@ -575,7 +576,7 @@ public class Ticket extends ListenerAdapter implements Command {
                         return;
                     }
                 } catch (SQLException exception) {
-                    exception.printStackTrace();
+                    Log.error("Ticket.replyTicketResult failed", exception);
                     event.reply("Couldn't load this ticket's staff settings. Please try again.")
                             .setEphemeral(true)
                             .queue();
@@ -595,8 +596,7 @@ public class Ticket extends ListenerAdapter implements Command {
                             try {
                                 Database.deleteTicketByChannelId(channel.getId());
                             } catch (SQLException exception) {
-                                System.err.println("Channel deleted, but ticket record removal failed.");
-                                exception.printStackTrace();
+                                Log.error("Channel deleted, but ticket record removal failed.", exception);
                             }
                         }));
             }
@@ -608,15 +608,14 @@ public class Ticket extends ListenerAdapter implements Command {
                         new TranscriptManager().sendTranscript(channel, hook)
                                 .whenComplete((ignored, error) -> {
                                     if (error != null) {
-                                        System.err.println("Transcript generation failed:");
-                                        error.printStackTrace();
+                                        Log.error("Transcript generation failed", error);
                                         hook.editOriginal(
                                                         "Couldn't create or upload the transcript. Please try again.")
                                                 .queue();
                                     }
                                 });
                     } catch (RuntimeException exception) {
-                        exception.printStackTrace();
+                        Log.error("Ticket.replyTicketResult failed", exception);
                         hook.editOriginal("Couldn't create the transcript. Please try again.").queue();
                     }
                 });

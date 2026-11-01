@@ -1,5 +1,6 @@
 package tickets;
 
+import utils.Log;
 import java.nio.charset.StandardCharsets;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -68,8 +69,7 @@ public class TranscriptManager {
     public void sendOnClose(TextChannel channel, TicketData ticket) {
         sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {
             if (error != null) {
-                System.err.println("Couldn't send the transcript for a closed ticket:");
-                error.printStackTrace();
+                Log.error("Couldn't send the transcript for a closed ticket", error);
             }
         });
     }
@@ -82,8 +82,7 @@ public class TranscriptManager {
                                Runnable afterDeleted) {
         sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {
             if (error != null) {
-                System.err.println("Transcript failed, ticket not deleted:");
-                error.printStackTrace();
+                Log.error("Transcript failed, ticket not deleted", error);
                 hook.editOriginal("Couldn't send the transcript to the transcript channel, so the ticket "
                         + "was **not** deleted. Check my permissions there (or clear the channel), then try again.")
                         .queue(null, editError -> { });

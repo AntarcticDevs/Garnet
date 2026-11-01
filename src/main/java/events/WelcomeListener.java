@@ -1,5 +1,6 @@
 package events;
 
+import utils.Log;
 import config.ConfigManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -86,7 +87,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
                     .setComponents(List.of())
                     .queue();
         } catch (NumberFormatException | SQLException exception) {
-            exception.printStackTrace();
+            Log.error("WelcomeListener.saveWelcomeEmbedId failed", exception);
             event.reply("Something went wrong while saving the welcome embed.")
                     .setEphemeral(true)
                     .queue();
@@ -112,7 +113,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
                 }
             }
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("WelcomeListener.showWelcomeEmbedMenu failed", exception);
             event.reply("Could not load this server's saved embeds.")
                     .setEphemeral(true)
                     .queue();
@@ -191,7 +192,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
             try {
                 embed = EmbedManager.loadEmbedById(guild, member, embedId);
             } catch (SQLException exception) {
-                exception.printStackTrace();
+                Log.error("WelcomeListener.sendWelcomeMessage failed", exception);
             }
         }
 
@@ -298,7 +299,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         }
 
     } catch (SQLException exception) {
-        exception.printStackTrace();
+        Log.error("WelcomeListener.getWelcomeEmbedId failed", exception);
     }
 
     return null;

@@ -29,6 +29,10 @@ public class ConfigManager {
             # The name shown in /help, embed footers and the console.
             bot-name: 'Garnet'
 
+            # Where the bot keeps its data (ticket panels, embeds, ...). Leave blank to use
+            # data/garnet.db. A bot that already has a garnet.db next to the jar keeps using it.
+            database-path: ''
+
             # Turn features on or off (true = on, false = off) and restart the bot afterwards.
             # A feature missing from this list stays on. Turning one off also removes its
             # slash commands from Discord and hides it from /help.

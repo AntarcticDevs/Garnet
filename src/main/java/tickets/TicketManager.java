@@ -1,5 +1,6 @@
 package tickets;
 
+import utils.Log;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.Category;
 import net.dv8tion.jda.api.entities.Member;
@@ -108,11 +109,11 @@ public class TicketManager {
                     try {
                         Database.deleteTicketByChannelId(channelID);
                     } catch (SQLException e) {
-                        e.printStackTrace();
+                        Log.error("TicketManager.deleteTicket failed", e);
                     }
                 },
                 error -> {
-                    error.printStackTrace();
+                    Log.error("TicketManager.deleteTicket failed", error);
                 });
     }
 
@@ -184,7 +185,7 @@ public class TicketManager {
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.claimTicket failed", e);
             return "DATABASE_ERROR";
         }
 
@@ -206,7 +207,7 @@ public class TicketManager {
         try {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.claimTicket failed", e);
             return "DATABASE_ERROR";
         }
 
@@ -222,7 +223,7 @@ public class TicketManager {
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.unclaimTicket failed", e);
             return "DATABASE_ERROR";
         }
         if (ticket == null) {
@@ -243,7 +244,7 @@ public class TicketManager {
         try {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.unclaimTicket failed", e);
             return "DATABASE_ERROR";
         }
 
@@ -259,7 +260,7 @@ public class TicketManager {
         try {
             ticket = Database.getTicketByChannelId(channelID);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.transferTicket failed", e);
             return "DATABASE_ERROR";
         }
         if (ticket == null) {
@@ -283,7 +284,7 @@ public class TicketManager {
         try {
             Database.updateTicket(ticket);
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("TicketManager.transferTicket failed", e);
             return "DATABASE_ERROR";
         }
 

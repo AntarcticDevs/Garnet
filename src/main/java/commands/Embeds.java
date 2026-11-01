@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import database.Database;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
@@ -130,7 +131,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
             event.replyChoices(choices).queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.onCommandAutoCompleteInteraction failed", exception);
             event.replyChoices(List.of()).queue();
         }
     }
@@ -157,7 +158,7 @@ public class Embeds extends ListenerAdapter implements Command {
             statement.executeUpdate();
             event.reply("Created embed `" + name + "`!").queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.createEmbed failed", exception);
             event.reply("Something went wrong while creating the embed.").setEphemeral(true).queue();
         }
     }
@@ -183,7 +184,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
             event.reply("Deleted embed `" + embedName + "`.").queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.deleteEmbed failed", exception);
             event.reply("Something went wrong while deleting the embed.").setEphemeral(true).queue();
         }
     }
@@ -236,7 +237,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
             event.reply("Updated embed `" + embedName + "`.").queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.addField failed", exception);
             event.reply("Something went wrong while updating the embed.").setEphemeral(true).queue();
         }
     }
@@ -277,7 +278,7 @@ public class Embeds extends ListenerAdapter implements Command {
             event.replyEmbeds(embed.build()).queue();
 
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.sendEmbed failed", exception);
 
             event.reply("Something went wrong while loading the embed.")
                     .setEphemeral(true)
@@ -327,7 +328,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
             event.reply("Added a field to embed `" + embedName + "`.").queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Embeds.addField failed", exception);
             event.reply("Something went wrong while adding the embed field.").setEphemeral(true).queue();
         }
     }

@@ -1,5 +1,6 @@
 package tickets;
 
+import utils.Log;
 import database.Database;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
@@ -324,7 +325,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         try {
             return Database.getPanelQuestions(panel.id, category);
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.loadQuestions failed", exception);
             return List.of();
         }
     }
@@ -444,7 +445,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         } catch (NumberFormatException exception) {
             deny(event, "Invalid ticket panel ID.");
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.deny failed", exception);
             deny(event, "Couldn't load the ticket panel. Please try again.");
         }
         return null;
@@ -486,7 +487,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         try {
             Database.savePanel(ctx.panel());
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.saveAndRefresh failed", exception);
             deny(event, "Couldn't save that change. Please try again.");
             return;
         }
@@ -574,7 +575,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         try {
             questions = Database.getPanelQuestions(panel.id, panel.categories.get(categoryIndex));
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.deny failed", exception);
             deny(event, "Couldn't load that category's questions. Please try again.");
             return;
         }
@@ -621,7 +622,7 @@ public class TicketPanelEditor extends ListenerAdapter {
                         panel.channelId = channel.getId();
                         panel.messageId = message.getId();
                     } catch (SQLException exception) {
-                        exception.printStackTrace();
+                        Log.error("TicketPanelEditor.refresh failed", exception);
                         hook.editOriginal(view(panel, ctx.page(), guild,
                                 "⚠️ The panel was sent but I couldn't remember its message, so it can't be updated in place."))
                                 .queue();
@@ -654,7 +655,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         try {
             Database.deletePanel(guild.getId(), panel.id);
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.deletePanel failed", exception);
             refresh(event, panel, ctx.page(), "⚠️ Couldn't delete the panel. Please try again.");
             return;
         }
@@ -728,7 +729,7 @@ public class TicketPanelEditor extends ListenerAdapter {
             Database.savePanelQuestions(panel.id, category, questions);
             refreshQuestions(event, panel, categoryIndex, "✅ Removed **" + truncate(removed.prompt(), 45) + "**.");
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.refreshQuestions failed", exception);
             deny(event, "Couldn't remove that question. Please try again.");
         }
     }
@@ -905,7 +906,7 @@ public class TicketPanelEditor extends ListenerAdapter {
             refreshQuestions(event, panel, categoryIndex,
                     (adding ? "✅ Added **" : "✅ Saved **") + truncate(question.prompt(), 45) + "**.");
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketPanelEditor.refreshQuestions failed", exception);
             deny(event, "Couldn't save the question. Please try again.");
         }
     }
