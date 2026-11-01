@@ -13,6 +13,7 @@ import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import utils.EmbedManager;
 import net.dv8tion.jda.api.EmbedBuilder;
 
@@ -38,6 +39,7 @@ public class Embeds extends ListenerAdapter implements Command {
                             .addOptions(embedNameOption()),
                         new SubcommandData("send", "Send an embed")
                             .addOptions(embedNameOption())
+                            .addOption(OptionType.CHANNEL, "channel", "The channel where the embed will be sent in.", false)
                 )
                 .addSubcommandGroups(
                         new SubcommandGroupData("edit", "Edit an embed")
@@ -96,7 +98,14 @@ public class Embeds extends ListenerAdapter implements Command {
         } else if ("edit".equals(event.getSubcommandGroup())) {
             editEmbed(event);
         } else if ("send".equals(event.getSubcommandName())) {
-            sendEmbed(event);
+
+            OptionMapping option = event.getOption("channel");
+            if (option != null) {
+                MessageChannel channel = option.getAsChannel().asGuildMessageChannel();
+                sendEmbed(event, channel);
+            } else {
+                sendEmbed(event, null);
+            }
         }
     }
 
@@ -244,7 +253,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
 
 
-    private void sendEmbed(SlashCommandInteractionEvent event) {
+    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) {
         if (event.getGuild() == null) {
             event.reply("This command can only be used in a server.")
                     .setEphemeral(true)
@@ -275,7 +284,14 @@ public class Embeds extends ListenerAdapter implements Command {
                 return;
             }
 
+            if (channel != null) {
+                channel.sendMessageEmbeds(embed.build()).queue(
+                    success -> event.reply("Embed sent successfully!").setEphemeral(true).queue(),
+                    error -> event.reply("Failed to send the embed.").setEphemeral(true).queue()
+                );
+            } else {
             event.replyEmbeds(embed.build()).queue();
+            }
 
         } catch (SQLException exception) {
             Log.error("Embeds.sendEmbed failed", exception);
