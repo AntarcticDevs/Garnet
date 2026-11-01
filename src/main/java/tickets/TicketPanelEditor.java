@@ -61,6 +61,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         APPEARANCE("appearance", "Appearance", "Title, colour, images and the button"),
         ROUTING("routing", "Roles & routing", "Staff and ping roles, channels"),
         CATEGORIES("categories", "Categories", "Dropdown categories and their questions"),
+        SETTINGS("settings", "Behaviour", "On/off, ticket limit, welcome message"),
         /** Sub-page of Categories that edits the questions of one category; not in the page menu. */
         QUESTIONS("questions", "Questions", "The form questions of one category");
 
@@ -155,6 +156,7 @@ public class TicketPanelEditor extends ListenerAdapter {
             case APPEARANCE -> addAppearance(children, panel, page);
             case ROUTING -> addRouting(children, panel, page, guild);
             case CATEGORIES -> addCategories(children, panel, page);
+            case SETTINGS -> addSettings(children, panel, page);
             case QUESTIONS -> addQuestions(children, panel, categoryIndex);
         }
 
@@ -178,7 +180,7 @@ public class TicketPanelEditor extends ListenerAdapter {
                 ? "Not published yet."
                 : (panel.messageId == null ? "Channel set: <#" + panel.channelId + ">. Not published yet."
                         : "Published in <#" + panel.channelId + ">.");
-        return "-# " + where + " Changes save automatically; press **"
+        return "-# " + (panel.disabled ? "🔒 **Disabled.** " : "") + where + " Changes save automatically; press **"
                 + (panel.messageId == null ? "Publish" : "Update panel") + "** to show them to members.";
     }
 
@@ -261,9 +263,10 @@ public class TicketPanelEditor extends ListenerAdapter {
 
         children.add(TextDisplay.of("**Transcript channel**\n"
                 + (panel.transcriptChannelId == null
-                        ? "*none: transcripts are sent privately to whoever requests them*"
+                        ? "*none: nothing is posted when a ticket is closed or deleted*"
                         : "<#" + panel.transcriptChannelId + ">")
-                + "\n-# Where ticket transcripts are posted."));
+                + "\n-# A transcript is posted here when a ticket is closed or deleted. "
+                + "Requested transcripts are always private to the person who asked."));
         EntitySelectMenu.Builder transcript = EntitySelectMenu.create(
                         id(panel, page, "transcript"), EntitySelectMenu.SelectTarget.CHANNEL)
                 .setChannelTypes(ChannelType.TEXT)
@@ -299,12 +302,16 @@ public class TicketPanelEditor extends ListenerAdapter {
             for (int index = 0; index < panel.categories.size(); index++) {
                 String category = panel.categories.get(index);
                 int count = questionCount(panel, category);
-                text.append(index + 1).append(". ").append(truncate(category, 60))
+                TicketPanelData.CategoryOption option = panel.categoryOption(category);
+                String emoji = TicketPanel.parseEmoji(option.emoji()) == null ? "" : option.emoji().trim() + " ";
+                text.append(index + 1).append(". ").append(emoji).append(truncate(category, 60))
                         .append(count == 0 ? "" : " · " + count + (count == 1 ? " question" : " questions"))
+                        .append(blankToNull(option.description()) == null
+                                ? "" : "\n    -# " + truncate(option.description(), 80))
                         .append('\n');
             }
         }
-        text.append("\n-# Members pick a category from a dropdown. Renaming a category removes its questions.");
+        text.append("\n-# Members pick a category from a dropdown. Renaming a category removes its questions and options.");
         children.add(row(id(panel, page, "categories"), text.toString()));
 
         if (!panel.categories.isEmpty()) {
@@ -314,7 +321,39 @@ public class TicketPanelEditor extends ListenerAdapter {
                 menu.addOptions(SelectOption.of(truncate(panel.categories.get(index), 100), Integer.toString(index)));
             }
             children.add(ActionRow.of(menu.build()));
+
+            StringSelectMenu.Builder options = StringSelectMenu.create(id(panel, page, "copt"))
+                    .setPlaceholder("Set a category's description and emoji");
+            for (int index = 0; index < panel.categories.size() && index < 25; index++) {
+                options.addOptions(SelectOption.of(truncate(panel.categories.get(index), 100), Integer.toString(index)));
+            }
+            children.add(ActionRow.of(options.build()));
         }
+    }
+
+    private void addSettings(List<ContainerChildComponent> children, TicketPanelData panel, Page page) {
+        children.add(Section.of(
+                panel.disabled
+                        ? Button.success(id(panel, page, "toggle"), "Enable")
+                        : Button.danger(id(panel, page, "toggle"), "Disable"),
+                TextDisplay.of("**Panel status**\n" + (panel.disabled ? "🔒 Disabled" : "✅ Enabled")
+                        + "\n-# Disabling replaces the button or dropdown on the posted panel right away. "
+                        + "Nobody can open tickets from it until it is enabled again.")));
+        children.add(row(id(panel, page, "dismsg"),
+                "**Disabled message**\n" + (panel.disabledMessage == null
+                        ? "*default: " + TicketPanel.DEFAULT_DISABLED_MESSAGE + "*"
+                        : truncate(panel.disabledMessage.replace('\n', ' '), 120))
+                        + "\n-# Shown on the panel while it is disabled. Press **Update panel** to apply a change."));
+        children.add(row(id(panel, page, "limit"),
+                "**Ticket limit**\n" + (panel.ticketLimit <= 0
+                        ? "*no limit*"
+                        : panel.ticketLimit + " open ticket" + (panel.ticketLimit == 1 ? "" : "s") + " per member")
+                        + "\n-# How many open tickets one member can have from this panel."));
+        children.add(row(id(panel, page, "welcome"),
+                "**Welcome message**\n" + (panel.welcomeMessage == null
+                        ? "*default: Opened by {user}. Please describe your request here.*"
+                        : truncate(panel.welcomeMessage.replace('\n', ' '), 120))
+                        + "\n-# First message in every new ticket. Use {user}, {username}, {category}, {panel}."));
     }
 
     private int questionCount(TicketPanelData panel, String category) {
@@ -362,6 +401,20 @@ public class TicketPanelEditor extends ListenerAdapter {
                         "Remove: " + truncate(questions.get(index).prompt(), 90), Integer.toString(index)));
             }
             children.add(ActionRow.of(remove.build()));
+        }
+        if (questions.size() >= 2) {
+            StringSelectMenu.Builder move = StringSelectMenu.create(id(panel, Page.QUESTIONS, "qmove", categoryArg))
+                    .setPlaceholder("Change the order of the questions");
+            for (int index = 0; index < questions.size(); index++) {
+                String prompt = truncate(questions.get(index).prompt(), 80);
+                if (index > 0) {
+                    move.addOptions(SelectOption.of("↑ Move up: " + prompt, "u:" + index));
+                }
+                if (index < questions.size() - 1) {
+                    move.addOptions(SelectOption.of("↓ Move down: " + prompt, "d:" + index));
+                }
+            }
+            children.add(ActionRow.of(move.build()));
         }
         children.add(ActionRow.of(
                 Button.primary(id(panel, Page.QUESTIONS, "qadd", categoryArg), "Add question")
@@ -548,6 +601,22 @@ public class TicketPanelEditor extends ListenerAdapter {
                             input("categories", TextInputStyle.PARAGRAPH, 2500,
                                     String.join("\n", panel.categories), "Billing\nSupport\nReport a user", false)))
                     .build()).queue();
+            case "dismsg" -> event.replyModal(Modal.create(id(panel, page, "dismsg"), "Disabled message")
+                    .addComponents(Label.of("Message", input("dismsg", TextInputStyle.PARAGRAPH, 1000,
+                            panel.disabledMessage, TicketPanel.DEFAULT_DISABLED_MESSAGE, false)))
+                    .build()).queue();
+            case "limit" -> event.replyModal(Modal.create(id(panel, page, "limit"), "Ticket limit")
+                    .addComponents(Label.of("Open tickets per member (0 = no limit)",
+                            input("limit", TextInputStyle.SHORT, 3,
+                                    panel.ticketLimit > 0 ? Integer.toString(panel.ticketLimit) : null,
+                                    "0 to 50", false)))
+                    .build()).queue();
+            case "welcome" -> event.replyModal(Modal.create(id(panel, page, "welcome"), "Welcome message")
+                    .addComponents(Label.of("Message ({user} {username} {category} {panel})",
+                            input("welcome", TextInputStyle.PARAGRAPH, 2000, panel.welcomeMessage,
+                                    "Hi {user}! A staff member will be with you soon.", false)))
+                    .build()).queue();
+            case "toggle" -> togglePanel(event, ctx);
             case "back" -> refresh(event, panel, Page.CATEGORIES, null);
             case "qadd" -> openQuestionModal(event, ctx, true);
             case "qedit" -> openQuestionModal(event, ctx, false);
@@ -561,6 +630,32 @@ public class TicketPanelEditor extends ListenerAdapter {
                     .queue();
             default -> deny(event, "That editor control isn't available.");
         }
+    }
+
+    /** Enables or disables the panel and updates the posted message in place straight away. */
+    private void togglePanel(ButtonInteractionEvent event, Ctx ctx) {
+        TicketPanelData panel = ctx.panel();
+        panel.disabled = !panel.disabled;
+        try {
+            Database.savePanel(panel);
+        } catch (SQLException exception) {
+            Log.error("TicketPanelEditor.togglePanel failed", exception);
+            deny(event, "Couldn't save that change. Please try again.");
+            return;
+        }
+        String state = panel.disabled ? "disabled" : "enabled";
+        var update = new TicketPanel().editPublished(event.getGuild(), panel);
+        if (update == null) {
+            refresh(event, panel, ctx.page(), "✅ Panel " + state + ". It isn't posted yet; publish it when you're ready.");
+            return;
+        }
+        Guild guild = event.getGuild();
+        event.deferEdit().queue(hook -> update.queue(
+                message -> hook.editOriginal(view(panel, ctx.page(), guild,
+                        "✅ Panel " + state + " and the posted message updated.")).queue(),
+                error -> hook.editOriginal(view(panel, ctx.page(), guild,
+                        "⚠️ Panel " + state + ", but I couldn't update the posted message. "
+                                + "Press **Update panel** to post it again.")).queue()));
     }
 
     private void openQuestionModal(ButtonInteractionEvent event, Ctx ctx, boolean adding) {
@@ -699,7 +794,61 @@ public class TicketPanelEditor extends ListenerAdapter {
                 refreshQuestions(event, ctx.panel(), index, null);
             }
             case "qremove" -> removeQuestion(event, ctx, value);
+            case "qmove" -> moveQuestion(event, ctx, value);
+            case "copt" -> {
+                int index;
+                try {
+                    index = Integer.parseInt(value);
+                } catch (NumberFormatException exception) {
+                    deny(event, "That category isn't available.");
+                    return;
+                }
+                if (index < 0 || index >= ctx.panel().categories.size()) {
+                    deny(event, "That category no longer exists. Reopen the editor and try again.");
+                    return;
+                }
+                String category = ctx.panel().categories.get(index);
+                TicketPanelData.CategoryOption option = ctx.panel().categoryOption(category);
+                event.replyModal(Modal.create(id(ctx.panel(), Page.CATEGORIES, "copt", Integer.toString(index)),
+                                "Category: " + truncate(category, 34))
+                        .addComponents(
+                                Label.of("Description (optional)", input("description", TextInputStyle.SHORT, 100,
+                                        option.description(), "Shown under the name in the dropdown", false)),
+                                Label.of("Emoji (optional)", input("emoji", TextInputStyle.SHORT, 80,
+                                        option.emoji(), "🎫 or a server emoji like <:name:id>", false)))
+                        .build()).queue();
+            }
             default -> deny(event, "That editor control isn't available.");
+        }
+    }
+
+    private void moveQuestion(StringSelectInteractionEvent event, Ctx ctx, String selected) {
+        TicketPanelData panel = ctx.panel();
+        int[] indexes = parseIndexes(ctx.arg(), 1);
+        if (indexes == null || indexes[0] < 0 || indexes[0] >= panel.categories.size()
+                || selected.length() < 3 || selected.charAt(1) != ':') {
+            deny(event, "That category no longer exists. Reopen the editor and try again.");
+            return;
+        }
+        int categoryIndex = indexes[0];
+        String category = panel.categories.get(categoryIndex);
+        try {
+            int from = Integer.parseInt(selected.substring(2));
+            int to = selected.charAt(0) == 'u' ? from - 1 : from + 1;
+            List<TicketQuestion> questions = new ArrayList<>(Database.getPanelQuestions(panel.id, category));
+            if (from < 0 || from >= questions.size() || to < 0 || to >= questions.size()) {
+                refreshQuestions(event, panel, categoryIndex, "⚠️ That question can't move there.");
+                return;
+            }
+            java.util.Collections.swap(questions, from, to);
+            Database.savePanelQuestions(panel.id, category, questions);
+            refreshQuestions(event, panel, categoryIndex, "✅ Moved **"
+                    + truncate(questions.get(to).prompt(), 45) + "** to position " + (to + 1) + ".");
+        } catch (NumberFormatException exception) {
+            deny(event, "That question isn't available.");
+        } catch (SQLException exception) {
+            Log.error("TicketPanelEditor.moveQuestion failed", exception);
+            deny(event, "Couldn't reorder the questions. Please try again.");
         }
     }
 
@@ -849,6 +998,36 @@ public class TicketPanelEditor extends ListenerAdapter {
                     panel.buttonStyle = parseStyleInput(value(event, "style"));
                 }
                 case "categories" -> panel.categories = parseCategories(value(event, "categories"));
+                case "dismsg" -> panel.disabledMessage = blankToNull(value(event, "dismsg"));
+                case "welcome" -> panel.welcomeMessage = blankToNull(value(event, "welcome"));
+                case "limit" -> {
+                    String text = value(event, "limit");
+                    int limit;
+                    try {
+                        limit = text.isEmpty() ? 0 : Integer.parseInt(text);
+                    } catch (NumberFormatException exception) {
+                        limit = -1;
+                    }
+                    if (limit < 0 || limit > 50) {
+                        throw new IllegalArgumentException("Use a whole number from 0 to 50 (0 means no limit).");
+                    }
+                    panel.ticketLimit = limit;
+                }
+                case "copt" -> {
+                    int[] indexes = parseIndexes(ctx.arg(), 1);
+                    if (indexes == null || indexes[0] < 0 || indexes[0] >= panel.categories.size()) {
+                        throw new IllegalArgumentException(
+                                "That category no longer exists. Reopen the editor and try again.");
+                    }
+                    String description = blankToNull(value(event, "description"));
+                    String emoji = value(event, "emoji");
+                    if (!emoji.isEmpty() && TicketPanel.parseEmoji(emoji) == null) {
+                        throw new IllegalArgumentException(
+                                "I couldn't read that emoji. Use a normal emoji or a server emoji like `<:name:id>`.");
+                    }
+                    panel.categoryOptions.put(panel.categories.get(indexes[0]),
+                            new TicketPanelData.CategoryOption(description, emoji.isEmpty() ? null : emoji));
+                }
                 case "qmodal" -> {
                     saveQuestion(event, ctx);
                     return;

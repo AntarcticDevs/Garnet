@@ -1,5 +1,7 @@
 package commands;
 
+import logging.LogCategory;
+import logging.LogService;
 import utils.Log;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
@@ -82,6 +84,14 @@ public class Purge extends ListenerAdapter implements Command {
         );
     }
 
+    private void logPurge(TextChannel channel, int count, net.dv8tion.jda.api.interactions.InteractionHook hook) {
+        LogService.send(channel.getGuild(), LogCategory.MODERATION,
+                LogService.embed("Messages purged", LogService.YELLOW)
+                        .addField("Channel", channel.getAsMention(), true)
+                        .addField("Messages", String.valueOf(count), true)
+                        .addField("Moderator", hook.getInteraction().getUser().getAsMention(), true));
+    }
+
     private void deleteMessages(
             TextChannel channel,
             List<Message> messages,
@@ -89,7 +99,10 @@ public class Purge extends ListenerAdapter implements Command {
     ) {
         if (messages.size() == 1) {
             messages.get(0).delete().queue(
-                    ignored -> hook.sendMessage("Deleted 1 message.").queue(),
+                    ignored -> {
+                        hook.sendMessage("Deleted 1 message.").queue();
+                        logPurge(channel, 1, hook);
+                    },
                     error -> {
                         Log.error("Purge.deleteMessages failed", error);
                         hook.sendMessage("I couldn't delete that message. Check my channel permissions.")
@@ -100,7 +113,10 @@ public class Purge extends ListenerAdapter implements Command {
         }
 
         channel.deleteMessages(messages).queue(
-                ignored -> hook.sendMessage("Deleted " + messages.size() + " messages.").queue(),
+                ignored -> {
+                    hook.sendMessage("Deleted " + messages.size() + " messages.").queue();
+                    logPurge(channel, messages.size(), hook);
+                },
                 error -> {
                     Log.error("Purge.deleteMessages failed", error);
                     hook.sendMessage("I couldn't delete those messages. Check my channel permissions and try again.")

@@ -46,6 +46,22 @@ public class TicketPanel {
                 .onErrorFlatMap(error -> channel.sendMessageEmbeds(embed).addComponents(row));
     }
 
+    /**
+     * Edits the already-published panel message in place (for example after enabling or disabling it).
+     * Returns null when the panel isn't published or its channel is gone.
+     */
+    public RestAction<Message> editPublished(Guild guild, TicketPanelData panelData) {
+        if (panelData.channelId == null || panelData.messageId == null) {
+            return null;
+        }
+        TextChannel channel = guild.getTextChannelById(panelData.channelId);
+        if (channel == null) {
+            return null;
+        }
+        return channel.editMessageEmbedsById(panelData.messageId, buildEmbed(panelData, guild))
+                .setComponents(buildActionRow(panelData));
+    }
+
     /** The panel embed exactly as members will see it. */
     public MessageEmbed buildEmbed(TicketPanelData panelData, Guild guild) {
         EmbedBuilder embed = new EmbedBuilder()
@@ -99,8 +115,20 @@ public class TicketPanel {
     static StringSelectMenu categoryMenu(TicketPanelData panelData) {
         StringSelectMenu.Builder categories = StringSelectMenu.create("ticket:category:" + panelData.id)
                 .setPlaceholder("Choose a ticket category");
-        panelData.categories.stream().limit(25).forEach(category ->
-                categories.addOptions(SelectOption.of(category, category)));
+        panelData.categories.stream().limit(25).forEach(category -> {
+            TicketPanelData.CategoryOption extra = panelData.categoryOption(category);
+            SelectOption option = SelectOption.of(category, category);
+            if (blankToNull(extra.description()) != null) {
+                String description = extra.description().trim();
+                option = option.withDescription(description.length() > 100
+                        ? description.substring(0, 100) : description);
+            }
+            Emoji emoji = parseEmoji(extra.emoji());
+            if (emoji != null) {
+                option = option.withEmoji(emoji);
+            }
+            categories.addOptions(option);
+        });
         return categories.build();
     }
 

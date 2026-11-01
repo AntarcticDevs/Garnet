@@ -12,6 +12,8 @@ import commands.Ticket;
 import commands.UserInfo;
 import config.ConfigManager;
 import events.WelcomeListener;
+import logging.LogCommand;
+import logging.ServerLogListener;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import tickets.TicketButton;
 import tickets.TicketPanelEditor;
@@ -42,7 +44,9 @@ public enum BotModule {
     WELCOMER("welcomer", "welcome messages for new members",
             () -> List.<ListenerAdapter>of(new WelcomeListener())),
     EMBEDS("embeds", "/embed and /rules",
-            () -> List.<ListenerAdapter>of(new Embeds(), new Rules()));
+            () -> List.<ListenerAdapter>of(new Embeds(), new Rules())),
+    LOGGING("logging", "/logs and the server and ticket log channel",
+            () -> List.<ListenerAdapter>of(new LogCommand(), new ServerLogListener()));
 
     private static final String SECTION = "modules";
 

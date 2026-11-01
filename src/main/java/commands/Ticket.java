@@ -45,7 +45,7 @@ public class Ticket extends ListenerAdapter implements Command {
         OptionData transcriptChannel = new OptionData(
                 OptionType.CHANNEL,
                 "channel",
-                "Where transcripts are sent; omit to send them privately to the requester",
+                "Where a transcript is posted when a ticket is closed or deleted; omit to turn it off",
                 false
         ).setChannelTypes(ChannelType.TEXT);
         OptionData panelName = new OptionData(
@@ -432,8 +432,8 @@ public class Ticket extends ListenerAdapter implements Command {
                 Database.savePanelTranscriptChannel(panelData.id, event.getGuild().getId(), channelId);
                 String result = channelOption == null
                         ? "Ticket transcripts for **" + panelData.name
-                                + "** will be sent privately to the staff member who requests them."
-                        : "Ticket transcripts for **" + panelData.name + "** will be sent to "
+                                + "** will no longer be posted when a ticket is closed or deleted."
+                        : "When a ticket from **" + panelData.name + "** is closed or deleted, its transcript will be posted in "
                                 + transcriptChannel.getAsMention() + ".";
                 event.reply(result).setEphemeral(true).queue();
             } catch (SQLException exception) {
@@ -588,18 +588,10 @@ public class Ticket extends ListenerAdapter implements Command {
                                         + event.getUser().getAsMention() + "."));
                 replyTicketResult(event, result, "Ticket transferred to " + assignee.getAsMention() + ".");
             }
-            case "delete" -> {
-                event.deferReply(true).queue(hook -> new TranscriptManager().sendThenDelete(
-                        channel, ticket, hook, () -> {
-                            // The reply to this command lives in the channel that was just deleted,
-                            // so it can't be edited anymore (Discord answers 10008 Unknown Message).
-                            try {
-                                Database.deleteTicketByChannelId(channel.getId());
-                            } catch (SQLException exception) {
-                                Log.error("Channel deleted, but ticket record removal failed.", exception);
-                            }
-                        }));
-            }
+            case "delete" -> event.reply(TicketButton.DELETE_PROMPT)
+                    .addComponents(TicketButton.deleteConfirmRow())
+                    .setEphemeral(true)
+                    .queue();
             case "transcript" -> {
                 // A requested transcript is private: posted ephemerally here. Close and delete
                 // are what send it to the panel's transcript channel.

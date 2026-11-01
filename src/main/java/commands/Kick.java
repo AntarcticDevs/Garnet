@@ -1,5 +1,7 @@
 package commands;
 
+import logging.LogCategory;
+import logging.LogService;
 import utils.Log;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
@@ -73,7 +75,15 @@ public class Kick extends ListenerAdapter implements Command {
 
         event.deferReply(true).queue(hook ->
                 target.kick().reason(reason).queue(
-                        ignored -> hook.sendMessage("Kicked " + target.getUser().getAsMention() + ".").queue(),
+                        ignored -> {
+                            hook.sendMessage("Kicked " + target.getUser().getAsMention() + ".").queue();
+                            LogService.send(event.getGuild(), LogCategory.MODERATION,
+                                    LogService.embed("Member kicked", LogService.RED)
+                                            .setDescription(target.getUser().getAsMention() + " ("
+                                                    + target.getUser().getName() + ", `" + target.getId() + "`)")
+                                            .addField("Moderator", event.getUser().getAsMention(), true)
+                                            .addField("Reason", reason, false));
+                        },
                         error -> {
                             Log.error("Kick.onSlashCommandInteraction failed", error);
                             hook.sendMessage("I couldn't kick that member. Check my permissions and role hierarchy.")

@@ -156,6 +156,8 @@ public class Database {
             addColumnIfMissing(connection, "ticket_panels", "message_id TEXT");
             addColumnIfMissing(connection, "ticket_panels", "disabled INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "disabled_message TEXT");
+            addColumnIfMissing(connection, "ticket_panels", "ticket_limit INTEGER NOT NULL DEFAULT 0");
+            addColumnIfMissing(connection, "ticket_panels", "welcome_message TEXT");
 
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panel_categories (
@@ -165,6 +167,25 @@ public class Database {
                         position INTEGER NOT NULL DEFAULT 0,
                         UNIQUE (panel_id, category_name),
                         FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS ticket_panel_category_options (
+                        panel_id INTEGER NOT NULL,
+                        category_name TEXT NOT NULL,
+                        description TEXT,
+                        emoji TEXT,
+                        PRIMARY KEY (panel_id, category_name),
+                        FOREIGN KEY (panel_id) REFERENCES ticket_panels(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS log_settings (
+                        guild_id TEXT PRIMARY KEY,
+                        channel_id TEXT,
+                        disabled_categories TEXT NOT NULL DEFAULT ''
                     )
                     """);
 
@@ -477,12 +498,12 @@ public class Database {
                                 + "embed_colour = ?, image_url = ?, thumbnail_url = ?, footer_text = ?, "
                                 + "button_label = ?, button_emoji = ?, button_style = ?, channel_id = ?, "
                                 + "transcript_channel_id = ?, "
-                                + "message_id = ?, disabled = ?, disabled_message = ? WHERE id = ?"
+                                + "message_id = ?, disabled = ?, disabled_message = ?, ticket_limit = ?, welcome_message = ? WHERE id = ?"
                         : "INSERT INTO ticket_panels (guild_id, name, content, ticket_category_id, embed_title, "
                                 + "embed_colour, image_url, thumbnail_url, footer_text, button_label, "
                                 + "button_emoji, button_style, channel_id, transcript_channel_id, message_id, "
-                                + "disabled, disabled_message) "
-                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                                + "disabled, disabled_message, ticket_limit, welcome_message) "
+                                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
                 try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                     int next = 1;
@@ -505,6 +526,8 @@ public class Database {
                     statement.setString(next++, panel.messageId);
                     statement.setInt(next++, panel.disabled ? 1 : 0);
                     statement.setString(next++, panel.disabledMessage);
+                    statement.setInt(next++, Math.max(0, panel.ticketLimit));
+                    statement.setString(next++, panel.welcomeMessage);
                     if (panelExists) {
                         statement.setInt(next, panel.id);
                     }
@@ -536,6 +559,7 @@ public class Database {
                 replacePanelValues(connection, panel.id, "ticket_panel_categories", "category_name", panel.categories);
                 replacePanelValues(connection, panel.id, "ticket_panel_staff_roles", "role_id", panel.staffRoles);
                 replacePanelValues(connection, panel.id, "ticket_panel_ping_roles", "role_id", panel.pingRoles);
+                saveCategoryOptions(connection, panel);
                 try (PreparedStatement cleanup = connection.prepareStatement(
                         "DELETE FROM ticket_panel_questions WHERE panel_id = ? AND category_name NOT IN "
                                 + "(SELECT category_name FROM ticket_panel_categories WHERE panel_id = ?)")) {
@@ -565,6 +589,89 @@ public class Database {
                 connection.rollback();
                 throw exception;
             }
+        }
+    }
+
+    /** Stores the dropdown description/emoji of the panel's categories; options of removed categories go. */
+    private static void saveCategoryOptions(Connection connection, TicketPanelData panel) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement(
+                "DELETE FROM ticket_panel_category_options WHERE panel_id = ?")) {
+            delete.setInt(1, panel.id);
+            delete.executeUpdate();
+        }
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO ticket_panel_category_options (panel_id, category_name, description, emoji) "
+                        + "VALUES (?, ?, ?, ?)")) {
+            for (String category : panel.categories) {
+                TicketPanelData.CategoryOption option = panel.categoryOptions.get(category);
+                if (option == null
+                        || ((option.description() == null || option.description().isBlank())
+                                && (option.emoji() == null || option.emoji().isBlank()))) {
+                    continue;
+                }
+                insert.setInt(1, panel.id);
+                insert.setString(2, category);
+                insert.setString(3, option.description());
+                insert.setString(4, option.emoji());
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
+    private static void loadCategoryOptions(Connection connection, TicketPanelData panel) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement(
+                "SELECT category_name, description, emoji FROM ticket_panel_category_options WHERE panel_id = ?")) {
+            statement.setInt(1, panel.id);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    panel.categoryOptions.put(resultSet.getString("category_name"),
+                            new TicketPanelData.CategoryOption(
+                                    resultSet.getString("description"), resultSet.getString("emoji")));
+                }
+            }
+        }
+    }
+
+    /** How many open tickets this member currently has from the given panel (closed ones don't count). */
+    public static int countOpenTickets(String creatorId, int panelId) throws SQLException {
+        String sql = "SELECT COUNT(*) FROM tickets WHERE creator_id = ? AND panel_id = ? AND state = 'OPEN'";
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, creatorId);
+            statement.setInt(2, panelId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getInt(1) : 0;
+            }
+        }
+    }
+
+    /** Log channel and switched-off categories of a server; null when the server never set any. */
+    public static String[] getLogSettings(String guildId) throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "SELECT channel_id, disabled_categories FROM log_settings WHERE guild_id = ?")) {
+            statement.setString(1, guildId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+                return new String[] {resultSet.getString("channel_id"), resultSet.getString("disabled_categories")};
+            }
+        }
+    }
+
+    public static void saveLogSettings(String guildId, String channelId, String disabledCategories)
+            throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "INSERT INTO log_settings (guild_id, channel_id, disabled_categories) VALUES (?, ?, ?) "
+                                + "ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id, "
+                                + "disabled_categories = excluded.disabled_categories")) {
+            statement.setString(1, guildId);
+            statement.setString(2, channelId);
+            statement.setString(3, disabledCategories == null ? "" : disabledCategories);
+            statement.executeUpdate();
         }
     }
 
@@ -640,8 +747,11 @@ public class Database {
         panelData.messageId = resultSet.getString("message_id");
         panelData.disabled = resultSet.getInt("disabled") != 0;
         panelData.disabledMessage = resultSet.getString("disabled_message");
+        panelData.ticketLimit = resultSet.getInt("ticket_limit");
+        panelData.welcomeMessage = resultSet.getString("welcome_message");
 
         panelData.categories = loadPanelValues(connection, panelData.id, "ticket_panel_categories", "category_name");
+        loadCategoryOptions(connection, panelData);
         panelData.staffRoles = loadPanelValues(connection, panelData.id, "ticket_panel_staff_roles", "role_id");
         panelData.pingRoles = loadPanelValues(connection, panelData.id, "ticket_panel_ping_roles", "role_id");
 
