@@ -45,7 +45,7 @@ public class Ticket extends ListenerAdapter implements Command {
         OptionData transcriptChannel = new OptionData(
                 OptionType.CHANNEL,
                 "channel",
-                "Where transcripts are sent; omit to send them privately to the requester",
+                "Where a transcript is posted when a ticket is closed or deleted; omit to turn it off",
                 false
         ).setChannelTypes(ChannelType.TEXT);
         OptionData panelName = new OptionData(
@@ -432,8 +432,8 @@ public class Ticket extends ListenerAdapter implements Command {
                 Database.savePanelTranscriptChannel(panelData.id, event.getGuild().getId(), channelId);
                 String result = channelOption == null
                         ? "Ticket transcripts for **" + panelData.name
-                                + "** will be sent privately to the staff member who requests them."
-                        : "Ticket transcripts for **" + panelData.name + "** will be sent to "
+                                + "** will no longer be posted when a ticket is closed or deleted."
+                        : "When a ticket from **" + panelData.name + "** is closed or deleted, its transcript will be posted in "
                                 + transcriptChannel.getAsMention() + ".";
                 event.reply(result).setEphemeral(true).queue();
             } catch (SQLException exception) {

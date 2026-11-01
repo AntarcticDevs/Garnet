@@ -46,6 +46,22 @@ public class TicketPanel {
                 .onErrorFlatMap(error -> channel.sendMessageEmbeds(embed).addComponents(row));
     }
 
+    /**
+     * Edits the already-published panel message in place (for example after enabling or disabling it).
+     * Returns null when the panel isn't published or its channel is gone.
+     */
+    public RestAction<Message> editPublished(Guild guild, TicketPanelData panelData) {
+        if (panelData.channelId == null || panelData.messageId == null) {
+            return null;
+        }
+        TextChannel channel = guild.getTextChannelById(panelData.channelId);
+        if (channel == null) {
+            return null;
+        }
+        return channel.editMessageEmbedsById(panelData.messageId, buildEmbed(panelData, guild))
+                .setComponents(buildActionRow(panelData));
+    }
+
     /** The panel embed exactly as members will see it. */
     public MessageEmbed buildEmbed(TicketPanelData panelData, Guild guild) {
         EmbedBuilder embed = new EmbedBuilder()
