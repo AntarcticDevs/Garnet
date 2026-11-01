@@ -22,6 +22,7 @@ import tickets.TicketPanelEditor;
 import tickets.TicketData;
 import tickets.TicketManager;
 import tickets.TicketPermissions;
+import tickets.TicketButton;
 import tickets.TranscriptManager;
 
 import java.sql.SQLException;
