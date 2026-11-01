@@ -2,30 +2,97 @@ package commands;
 
 import config.ConfigManager;
 import modules.BotModule;
+import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.container.Container;
 import net.dv8tion.jda.api.components.container.ContainerChildComponent;
 import net.dv8tion.jda.api.components.section.Section;
+import net.dv8tion.jda.api.components.selections.SelectOption;
+import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.separator.Separator;
 import net.dv8tion.jda.api.components.textdisplay.TextDisplay;
+import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
+import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageEditBuilder;
 
-import net.dv8tion.jda.api.components.container.Container;
-import net.dv8tion.jda.api.components.separator.Separator;
-
-import net.dv8tion.jda.api.components.thumbnail.Thumbnail;
-
+import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * /help: an overview of what this bot can do, with a menu to browse each feature.
+ * Only features that are switched on in config.yml (modules:) are listed, so every host gets a help
+ * page that matches their own bot.
+ */
 public class Help extends ListenerAdapter implements Command {
+
+    private static final String MENU_ID = "help:page";
+    private static final String OVERVIEW = "overview";
+    private static final Color ACCENT = new Color(0x5865F2);
+
+    /** One browsable page; {@code module} is null for pages that are always shown. */
+    private record Page(BotModule module, String key, String emoji, String title, String summary, String body) {
+    }
+
+    private static final List<Page> PAGES = List.of(
+            new Page(BotModule.INFORMATION, "information", "ℹ️", "Information",
+                    "Latency, server, user and avatar info",
+                    """
+                    `/ping` Shows the bot's latency.
+                    `/info` Shows information about this server.
+                    `/userinfo [user]` Shows information about a member.
+                    `/avatar [user]` Shows a member's avatar."""),
+            new Page(BotModule.MODERATION, "moderation", "🛡️", "Moderation",
+                    "Ban, kick and clean up messages",
+                    """
+                    `/purge amount` Deletes up to 100 recent messages. *Needs Manage Messages.*
+                    `/kick user [reason]` Kicks a member. *Needs Kick Members.*
+                    `/ban user [reason]` Bans a user. *Needs Ban Members.*"""),
+            new Page(BotModule.TICKETS, "tickets", "🎫", "Tickets",
+                    "Panels, private ticket channels and transcripts",
+                    """
+                    **Set up** *(needs Manage Server)*
+                    `/ticket panel create name` Creates a panel.
+                    `/ticket panel edit name` Opens the panel editor: look, roles, categories, questions, limits.
+                    `/ticket panel send name channel` Posts the panel.
+                    `/ticket panel disable name [message]` and `enable name` Turns a panel off or on.
+                    `/ticket panel staff-roles`, `ping-roles`, `transcript-channel` Quick shortcuts for routing.
+                    `/ticket set-category category` Default Discord category for new tickets.
+
+                    **Inside a ticket**
+                    `/ticket close`, `reopen` The creator or staff.
+                    `/ticket claim`, `unclaim`, `transfer member` Staff.
+                    `/ticket transcript` A private transcript, staff only.
+                    `/ticket delete` Asks to confirm, then deletes. Admins only.
+                    -# When a ticket is closed or deleted, its transcript goes to the panel's transcript channel."""),
+            new Page(BotModule.WELCOMER, "welcomer", "👋", "Welcomer",
+                    "Greets new members",
+                    """
+                    `/welcomer setchannel channel` Where welcome messages go.
+                    `/welcomer setembed` Choose which saved embed is used.
+                    `/welcomer test [user]` Sends a test welcome message."""),
+            new Page(BotModule.EMBEDS, "embeds", "🧩", "Embeds & rules",
+                    "Build and send custom embeds, set the rules",
+                    """
+                    `/embed create`, `edit`, `send`, `delete` Build embeds, save them and post them anywhere.
+                    `/rules select` Pick up to five saved embeds as this server's rules."""),
+            new Page(BotModule.LOGGING, "logging", "📜", "Logging",
+                    "A log channel for tickets, members, moderation and more",
+                    """
+                    `/logs channel [channel]` Choose where logs are posted (leave empty to turn logging off).
+                    `/logs toggle category on/off` Switch tickets, members, moderation, server or voice logs.
+                    `/logs status` Shows what is being logged. *Needs Manage Server.*"""));
 
     @Override
     public CommandData getCommandData() {
-        return Commands.slash("help", "Shows information about the bot and commands");
+        return Commands.slash("help", "Shows what this bot can do");
     }
 
     @Override
@@ -33,49 +100,74 @@ public class Help extends ListenerAdapter implements Command {
         if (!event.getName().equals("help")) {
             return;
         }
+        // Ephemeral, so the menu belongs to whoever asked instead of changing a message everyone sees.
+        event.reply(new MessageCreateBuilder()
+                        .useComponentsV2()
+                        .addComponents(build(event.getJDA(), OVERVIEW))
+                        .build())
+                .setEphemeral(true)
+                .queue();
+    }
 
+    @Override
+    public void onStringSelectInteraction(StringSelectInteractionEvent event) {
+        if (!MENU_ID.equals(event.getComponentId()) || event.getValues().isEmpty()) {
+            return;
+        }
+        event.editMessage(new MessageEditBuilder()
+                        .useComponentsV2()
+                        .setComponents(build(event.getJDA(), event.getValues().get(0)))
+                        .build())
+                .queue();
+    }
+
+    private static List<Page> enabledPages() {
+        List<Page> pages = new ArrayList<>();
+        for (Page page : PAGES) {
+            if (page.module().isEnabled()) {
+                pages.add(page);
+            }
+        }
+        return pages;
+    }
+
+    private Container build(JDA jda, String requestedKey) {
         String botName = ConfigManager.getBotName();
+        List<Page> pages = enabledPages();
+        Page current = null;
+        for (Page page : pages) {
+            if (page.key().equals(requestedKey)) {
+                current = page;
+            }
+        }
+
         String thumbnailUrl = ConfigManager.getString("help-thumbnail-url");
-        if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
-            thumbnailUrl = event.getJDA().getSelfUser().getEffectiveAvatarUrl();
+        if (thumbnailUrl == null) {
+            thumbnailUrl = jda.getSelfUser().getEffectiveAvatarUrl();
         }
+        TextDisplay heading = TextDisplay.of("# " + botName + " Help\n"
+                + (current == null
+                        ? "Pick a feature from the menu to see its commands."
+                        : current.emoji() + " **" + current.title() + "**"));
 
-        TextDisplay heading = TextDisplay.of(
-                "# " + botName + " Help\n" + "**Welcome to " + botName + "! Here are the available commands.**");
-        ContainerChildComponent headingComponent = thumbnailUrl == null || thumbnailUrl.isBlank()
-                ? heading
-                : Section.of(Thumbnail.fromUrl(thumbnailUrl), heading);
-
-        TextDisplay information = TextDisplay.of(
-                "### ℹ️ Information\n" +
-                "`/ping` — Shows the bot's latency.\n" +
-                "`/info` — Shows server information.\n" +
-                "`/userinfo` — Shows information about a user.\n" +
-                "`/avatar` — Shows a user's avatar."
-        );
-
-        TextDisplay moderation = TextDisplay.of(
-                "### 🛡️ Moderation\n" +
-                "`/purge amount` — Delete up to 100 recent messages (Manage Messages).\n" +
-                "`/kick user [reason]` — Kick a member (Kick Members).\n" +
-                "`/ban user [reason]` — Ban a user (Ban Members)."
-        );
-        TextDisplay fun = TextDisplay.of("### 🎉 Fun\n" + "Coming soon...");
-        TextDisplay utility = TextDisplay.of("### ⚙️ Utility\n" + "`/embed` — Create, edit, and send embeds.\n" + "`/rules select` — Select a saved embed as this server's rules.");
         List<ContainerChildComponent> children = new ArrayList<>();
-        children.add(headingComponent);
+        children.add(thumbnailUrl == null ? heading : Section.of(Thumbnail.fromUrl(thumbnailUrl), heading));
         children.add(Separator.createDivider(Separator.Spacing.LARGE));
-        // Only list commands that are actually registered (see modules: in config.yml).
-        if (BotModule.INFORMATION.isEnabled()) {
-            children.add(information);
+
+        if (current == null) {
+            StringBuilder overview = new StringBuilder("**What I can do**\n");
+            for (Page page : pages) {
+                overview.append(page.emoji()).append(" **").append(page.title()).append("** · ")
+                        .append(page.summary()).append('\n');
+            }
+            overview.append("\n-# Slash commands: type `/` and pick one. Many are limited to staff.");
+            children.add(TextDisplay.of(overview.toString()));
+        } else {
+            children.add(TextDisplay.of(current.body()));
         }
-        if (BotModule.MODERATION.isEnabled()) {
-            children.add(moderation);
-        }
-        children.add(fun);
-        if (BotModule.EMBEDS.isEnabled()) {
-            children.add(utility);
-        }
+
+        children.add(Separator.createDivider(Separator.Spacing.SMALL));
+        children.add(ActionRow.of(menu(pages, current)));
 
         List<Button> linkButtons = new ArrayList<>();
         addLinkButton(linkButtons, "support-url", "Support Server");
@@ -83,24 +175,31 @@ public class Help extends ListenerAdapter implements Command {
         addLinkButton(linkButtons, "privacy-url", "Privacy");
         addLinkButton(linkButtons, "security-url", "Security");
         if (!linkButtons.isEmpty()) {
-            children.add(Separator.createDivider(Separator.Spacing.LARGE));
             children.add(ActionRow.of(linkButtons));
         }
 
-        children.add(Separator.createDivider(Separator.Spacing.LARGE));
-        children.add(TextDisplay.of("-# © 2026 " + botName + " • All rights reserved."));
-        Container container = Container.of(children);
+        children.add(TextDisplay.of("-# " + botName + " · " + pages.size() + " feature"
+                + (pages.size() == 1 ? "" : "s") + " enabled"));
+        return Container.of(children).withAccentColor(ACCENT);
+    }
 
-        MessageCreateBuilder message = new MessageCreateBuilder()
-                .useComponentsV2()
-                .addComponents(container);
-
-        event.reply(message.build()).queue();
+    private StringSelectMenu menu(List<Page> pages, Page current) {
+        StringSelectMenu.Builder menu = StringSelectMenu.create(MENU_ID).setPlaceholder("Browse a feature");
+        menu.addOptions(SelectOption.of("Overview", OVERVIEW)
+                .withEmoji(Emoji.fromUnicode("🏠"))
+                .withDescription("Everything this bot can do"));
+        for (Page page : pages) {
+            menu.addOptions(SelectOption.of(page.title(), page.key())
+                    .withEmoji(Emoji.fromUnicode(page.emoji()))
+                    .withDescription(page.summary()));
+        }
+        menu.setDefaultValues(current == null ? OVERVIEW : current.key());
+        return menu.build();
     }
 
     private void addLinkButton(List<Button> buttons, String configKey, String label) {
         String url = ConfigManager.getString(configKey);
-        if (url != null && !url.isBlank()) {
+        if (url != null) {
             buttons.add(Button.link(url, label));
         }
     }

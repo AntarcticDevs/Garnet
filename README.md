@@ -1,71 +1,176 @@
-# Garnet 
+# Garnet
 
-**Garnet** is a Java-based Discord bot focused on giving communities practical tools for server management, configuration, utilities, and support — while keeping the experience clean, modern, and easy to use.
+Garnet is a self-hosted Discord bot engine written in Java. You run one jar, it creates its own
+`config.yml`, you paste in your bot token, and you have your own bot with tickets, logging,
+moderation, embeds and a welcomer. Every feature can be switched on or off in the config.
 
-> 🚧 **Garnet is currently under active development.**
+> Garnet is under active development. Run it on a test server first and keep backups of `data/`.
 
-##  Features
+## Features
 
--  Discord bot functionality powered by JDA
--  Customisable embeds
--  Configurable server rules
--  Welcome messages
--  SQLite database persistence
--  Ticket system
--  Server-management and utility commands
+| Feature | What it does |
+| --- | --- |
+| **Tickets** | Panels with a button or category dropdown, per-category forms, claim / transfer / close / reopen, delete confirmation, transcripts, per-member limits, welcome message per panel, and a panel editor inside Discord |
+| **Logging** | `/logs` sets a log channel for tickets, members, moderation, server changes and (optionally) voice |
+| **Moderation** | `/ban`, `/kick`, `/purge` |
+| **Embeds** | `/embed` builder, saved embeds, `/rules` |
+| **Welcomer** | Welcome message for new members using a saved embed |
+| **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
+| **Help** | `/help` lists only the features you turned on |
 
-##  Technology Stack
+## Requirements
 
-- **Java 25**
-- **JDA 6.7.0**
-- **Maven**
-- **SQLite**
+- **Java 21 or newer** to run it (`java -version`)
+- **Maven** and a JDK to build it yourself, or a ready-made `main.jar`
+- A Discord application with a bot user: <https://discord.com/developers/applications>
+
+## Quick start
+
+1. **Build** (skip if you were given a jar):
+
+   ```
+   mvn package
+   ```
+
+   The jar is `target/main.jar`.
+
+2. **Run it once** in the folder where the bot should live:
+
+   ```
+   java -jar main.jar
+   ```
+
+   It creates `config.yml` and stops.
+
+3. **Add the token.** Open `config.yml` and put your token between the quotes:
+
+   ```yaml
+   token: 'your-bot-token'
+   ```
+
+   Never share the token. If it leaks, reset it on the Bot page of your application.
+
+4. **Turn on the Server Members Intent.** In the developer portal: *Bot* → *Privileged Gateway Intents* →
+   *Server Members Intent*. Without it the bot refuses to start (it tells you so).
+
+5. **Invite the bot** with the `bot` and `applications.commands` scopes. A good set of permissions:
+   Manage Channels, Manage Roles, View Channels, Send Messages, Embed Links, Attach Files,
+   Read Message History, Manage Messages, Kick Members, Ban Members and View Audit Log.
+   (Administrator also works, but the bot only needs the above.)
+
+6. **Start it again:**
+
+   ```
+   java -jar main.jar
+   ```
+
+   Slash commands are registered on every start. They can take a moment to show up in Discord.
+
+To keep it running after you close the terminal, use `screen`, `tmux`, a systemd service or your host's
+panel (any host that can run `java -jar` works).
 
 ## Configuration
 
-On first startup, Garnet creates `config.yml` in the working directory. Set the bot's Discord token in the `token` field before launching the bot. Keep this file private; it is excluded from Git.
+Everything lives in `config.yml`, which is created next to the jar and never committed to Git.
+Restart the bot after changing it.
 
-##  Ticket System
+```yaml
+token: ''                 # your bot token
+bot-name: 'Garnet'        # shown in /help and the console
+database-path: ''         # blank = data/garnet.db
 
-Garnet's ticket system is being developed from the ground up with a focus on reliable data management and maintainable code.
+modules:                  # true = on, false = off
+  information: true
+  moderation: true
+  tickets: true
+  welcomer: true
+  embeds: true
+  logging: true
 
-### Progress
+support-url: ''           # optional buttons in /help; blank hides them
+terms-url: ''
+privacy-url: ''
+security-url: ''
+help-thumbnail-url: ''    # blank = the bot's avatar
+```
 
-- [x] Ticket data model
-- [x] Create tickets
-- [x] Close tickets
-- [x] Reopen tickets
-- [x] Claim tickets
-- [x] Unclaim tickets
-- [x] Transfer tickets
-- [x] SQLite persistence
-- [x] Delete ticket data
-- [x] Ticket commands for closing, reopening, claiming, unclaiming, transferring, deleting, and transcribing tickets
-- [x] Configurable ticket panels with category selection
-- [x] Text transcripts (latest 1,000 messages)
-- [x] Server and panel ticket configuration, including channel categories and staff/ping roles
+- A feature missing from `modules:` stays on, so an old config keeps working after an update.
+- Turning a module off removes its slash commands and its section in `/help`.
+- Typos and invalid values in `modules:` are reported when the bot starts.
 
-Use `/ticket panel create`, `/ticket panel edit`, and `/ticket panel send` to publish a panel. In the panel editor, configure comma-separated categories, then use **Category Questions** to give each category up to five required form prompts (one prompt per line). Selecting a category opens that form before creating the ticket. New tickets start with an embed containing the submitted answers and controls; only members with **Manage Channels** can claim, unclaim, transfer, delete, or create a transcript. Ticket creators can close and reopen their ticket. Use `/ticket panel transcript-channel` with a panel name and optional text channel to configure where that panel's transcripts are uploaded; omit the channel to clear the setting and send transcripts privately to the requester. The ticket's **Transfer** button opens a member picker and only accepts staff configured for that ticket's panel.
+## Files the bot creates
 
-##  Project Structure
+| Path | Contents |
+| --- | --- |
+| `config.yml` | Your settings |
+| `data/garnet.db` | Everything the bot saves (panels, tickets, embeds, log settings). **Back this up.** |
+| `logs/latest.log` | This run's log. `previous.log` is the run before. Send `latest.log` when asking for help. |
 
-Garnet is organised into separate packages for commands, events, database functionality, and ticket management.
+## Updating
 
-The project is developed incrementally, with an emphasis on keeping the code clean, maintainable, and easy to understand.
+Stop the bot, replace the jar, start it again. New versions add database columns and tables on startup
+and never remove existing data, so panels, tickets and embeds carry over.
 
-##  Policies
+A bot from an older version that has `garnet.db` next to the jar keeps using that file. To move it into the
+data folder, stop the bot, move the file to `data/garnet.db` and start it again (or set `database-path`).
 
-- [Privacy Policy](https://github.com/GarnetDiscordBot/Garnet/blob/main/PRIVACY.md)
-- [Terms of Service](https://github.com/GarnetDiscordBot/Garnet/blob/main/TERMS.md)
-- [Security Policy](https://github.com/GarnetDiscordBot/Garnet/blob/main/SECURITY.md)
+## Tickets
 
-##  Status
+Setup needs **Manage Server**. A short walkthrough:
 
-Garnet is a personal development project and is **not currently intended for general public use**.
+1. `/ticket panel create name:Support`
+2. `/ticket panel edit name:Support` opens the editor. It is one message that updates in place:
+   - **Appearance:** title, description, colour, images, footer and the button
+   - **Roles & routing:** staff roles, ping roles, the Discord category for new tickets, the panel channel
+     and the transcript channel
+   - **Categories:** the dropdown entries, each with an optional description and emoji, and the questions
+     members answer for it (short or paragraph, required or optional, reorderable)
+   - **Behaviour:** enable or disable the panel, the disabled message, a per-member ticket limit and the
+     welcome message (`{user}`, `{username}`, `{category}`, `{panel}`)
+3. Pick the panel channel in the editor and press **Publish**. Pressing **Update panel** later edits the same
+   message instead of posting a new one.
 
-Features, documentation, and policies may change as development continues.
+In a ticket: members can close and reopen their own ticket; staff (a staff role on the panel, or Manage Channels)
+can claim, unclaim, transfer, and get a private transcript. Only admins can delete, and they are asked to confirm.
 
-##  Links
+**Transcripts.** The Transcript button and `/ticket transcript` reply privately to whoever asked. When a ticket is
+closed or deleted, the transcript is posted to the panel's transcript channel if one is set. A delete waits for the
+transcript, so a ticket is not deleted if the transcript could not be posted.
 
-- [Discord Server](https://dsc.gg/garnetbot)
-- [Source Code](https://github.com/EnderKnight7op/Garnet)
+`/ticket panel disable name [message]` swaps the button or dropdown on the posted panel for a disabled notice
+(your message, or a default). `/ticket panel enable name` restores it.
+
+## Logging
+
+`/logs channel #channel` turns it on, `/logs status` shows the settings and `/logs toggle` switches a category:
+
+| Category | Events |
+| --- | --- |
+| `tickets` | opened, closed, reopened, claimed, unclaimed, transferred, deleted |
+| `members` | joins, leaves, nickname and role changes |
+| `moderation` | bans, unbans, kicks, purges |
+| `server` | channels and roles created or deleted |
+| `voice` | voice joins, leaves and moves (off by default; it is noisy) |
+
+The bot needs View Channel, Send Messages and Embed Links in the log channel, and View Audit Log to show who
+banned someone.
+
+## Troubleshooting
+
+- **"Discord rejected the bot token"**: copy the token again from the Bot page into `config.yml`.
+- **Bot won't start and mentions an intent**: turn on the Server Members Intent (step 4).
+- **Commands don't appear**: wait a minute, check the bot was invited with `applications.commands`, restart it.
+- **Ticket channels aren't created**: give the bot Manage Channels and Manage Roles, and make sure its role is above the
+  roles you use as staff roles.
+- **Something else**: open `logs/latest.log`; errors include the full stack trace.
+
+## Building from source
+
+```
+git clone https://github.com/EnderKnight7op/Garnet.git
+cd Garnet
+mvn package
+```
+
+Java 21, JDA 6.7.0, SQLite (`sqlite-jdbc`) and SnakeYAML. To add a feature, add a constant to
+`modules/BotModule.java` with the listeners it needs and a line to the `modules:` section in `ConfigManager`.
