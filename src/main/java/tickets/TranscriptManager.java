@@ -89,7 +89,11 @@ public class TranscriptManager {
                 return;
             }
             channel.delete().queue(
-                    deleted -> afterDeleted.run(),
+                    deleted -> {
+                        TicketLog.log(channel.getGuild(), TicketLog.Kind.DELETED, ticket, channel.getName(),
+                                "Deleted by " + hook.getInteraction().getUser().getAsMention() + ".");
+                        afterDeleted.run();
+                    },
                     deleteError -> hook.editOriginal("Couldn't delete the ticket channel. Check my permissions.")
                             .queue(null, editError -> { }));
         });

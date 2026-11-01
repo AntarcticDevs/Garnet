@@ -588,18 +588,10 @@ public class Ticket extends ListenerAdapter implements Command {
                                         + event.getUser().getAsMention() + "."));
                 replyTicketResult(event, result, "Ticket transferred to " + assignee.getAsMention() + ".");
             }
-            case "delete" -> {
-                event.deferReply(true).queue(hook -> new TranscriptManager().sendThenDelete(
-                        channel, ticket, hook, () -> {
-                            // The reply to this command lives in the channel that was just deleted,
-                            // so it can't be edited anymore (Discord answers 10008 Unknown Message).
-                            try {
-                                Database.deleteTicketByChannelId(channel.getId());
-                            } catch (SQLException exception) {
-                                Log.error("Channel deleted, but ticket record removal failed.", exception);
-                            }
-                        }));
-            }
+            case "delete" -> event.reply(TicketButton.DELETE_PROMPT)
+                    .addComponents(TicketButton.deleteConfirmRow())
+                    .setEphemeral(true)
+                    .queue();
             case "transcript" -> {
                 // A requested transcript is private: posted ephemerally here. Close and delete
                 // are what send it to the panel's transcript channel.

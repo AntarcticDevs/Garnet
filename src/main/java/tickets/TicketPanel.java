@@ -99,8 +99,20 @@ public class TicketPanel {
     static StringSelectMenu categoryMenu(TicketPanelData panelData) {
         StringSelectMenu.Builder categories = StringSelectMenu.create("ticket:category:" + panelData.id)
                 .setPlaceholder("Choose a ticket category");
-        panelData.categories.stream().limit(25).forEach(category ->
-                categories.addOptions(SelectOption.of(category, category)));
+        panelData.categories.stream().limit(25).forEach(category -> {
+            TicketPanelData.CategoryOption extra = panelData.categoryOption(category);
+            SelectOption option = SelectOption.of(category, category);
+            if (blankToNull(extra.description()) != null) {
+                String description = extra.description().trim();
+                option = option.withDescription(description.length() > 100
+                        ? description.substring(0, 100) : description);
+            }
+            Emoji emoji = parseEmoji(extra.emoji());
+            if (emoji != null) {
+                option = option.withEmoji(emoji);
+            }
+            categories.addOptions(option);
+        });
         return categories.build();
     }
 

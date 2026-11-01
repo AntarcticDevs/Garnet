@@ -40,6 +40,12 @@ public class TicketButton extends ListenerAdapter {
             closeTicket(event);
             return;
         }
+        if ("ticket:deletecancel".equals(customId)) {
+            event.editMessage("Cancelled. The ticket was not deleted.")
+                    .setComponents(java.util.Collections.emptyList())
+                    .queue();
+            return;
+        }
         if ("ticket:reopen".equals(customId)) {
             reopenTicket(event);
             return;
@@ -149,6 +155,11 @@ public class TicketButton extends ListenerAdapter {
                 event.reply(disabledText(panelData)).setEphemeral(true).queue();
                 return;
             }
+            String limit = limitMessage(event.getMember(), panelData);
+            if (limit != null) {
+                event.reply(limit).setEphemeral(true).queue();
+                return;
+            }
             String categoryName = event.getValues().get(0);
             event.getMessage().editMessageComponents(ActionRow.of(TicketPanel.categoryMenu(panelData))).queue();
             List<TicketQuestion> questions = Database.getPanelQuestions(panelId, categoryName);
@@ -188,6 +199,43 @@ public class TicketButton extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         }
+    }
+
+    /** Why this member can't open another ticket from the panel (its per-member limit), or null if they can. */
+    private static String limitMessage(Member member, TicketPanelData panelData) throws SQLException {
+        if (panelData == null || panelData.ticketLimit <= 0) {
+            return null;
+        }
+        int open = Database.countOpenTickets(member.getId(), panelData.id);
+        if (open < panelData.ticketLimit) {
+            return null;
+        }
+        return "You already have " + open + " open ticket" + (open == 1 ? "" : "s") + " from this panel (the limit is "
+                + panelData.ticketLimit + "). Please close one before opening another.";
+    }
+
+    /** The first message of a ticket: the panel's welcome message, or the default. Placeholders are filled in. */
+    private static String welcomeText(TicketPanelData panelData, Member member, String categoryName) {
+        String template = panelData == null || panelData.welcomeMessage == null || panelData.welcomeMessage.isBlank()
+                ? "Opened by {user}. Please describe your request here."
+                : panelData.welcomeMessage;
+        String text = template
+                .replace("{user}", member.getAsMention())
+                .replace("{username}", member.getUser().getName())
+                .replace("{category}", categoryName == null ? "Support" : categoryName)
+                .replace("{panel}", panelData == null ? "Support" : panelData.name);
+        return text.length() > 4000 ? text.substring(0, 3997) + "..." : text;
+    }
+
+    public static final String DELETE_PROMPT =
+            "⚠️ **Delete this ticket?** The channel and its record are removed for good. "
+                    + "If the panel has a transcript channel, the transcript is sent there first.";
+
+    /** The Yes/Cancel buttons shown under {@link #DELETE_PROMPT}; also used by /ticket delete. */
+    public static ActionRow deleteConfirmRow() {
+        return ActionRow.of(
+                Button.danger("ticket:staff:deleteconfirm", "Yes, delete"),
+                Button.secondary("ticket:deletecancel", "Cancel"));
     }
 
     private static String disabledText(TicketPanelData panelData) {
@@ -233,6 +281,11 @@ public class TicketButton extends ListenerAdapter {
             String categoryId = panelData != null && panelData.ticketCategoryId != null
                     ? panelData.ticketCategoryId
                     : Database.getTicketCategory(guild.getId());
+            String limit = limitMessage(member, panelData);
+            if (limit != null) {
+                completion.accept(limit);
+                return;
+            }
             List<String> staffRoles = panelData == null ? List.of() : panelData.staffRoles;
             List<String> pingRoles = panelData == null ? List.of() : panelData.pingRoles;
             new TicketManager().createTicket(
@@ -246,7 +299,8 @@ public class TicketButton extends ListenerAdapter {
                     ticket -> {
                         try {
                             postTicketMessage(
-                                    guild, member, categoryName, questions, answers, pingRoles, ticket, completion);
+                                    guild, member, panelData, categoryName, questions, answers, pingRoles, ticket,
+                                    completion);
                         } catch (RuntimeException exception) {
                             reportTicketCreationFailure(exception, completion);
                         }
@@ -260,6 +314,7 @@ public class TicketButton extends ListenerAdapter {
     private void postTicketMessage(
             net.dv8tion.jda.api.entities.Guild guild,
             Member member,
+            TicketPanelData panelData,
             String categoryName,
             List<String> questions,
             List<String> answers,
@@ -270,7 +325,7 @@ public class TicketButton extends ListenerAdapter {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(categoryName == null ? "Support ticket" : categoryName + " ticket")
                 .setAuthor(member.getUser().getName(), null, member.getUser().getAvatarUrl())
-                .setDescription("Opened by " + member.getAsMention() + ". Please describe your request here.")
+                .setDescription(welcomeText(panelData, member, categoryName))
                 .setFooter("Ticket ID: " + ticket.id);
         for (int i = 0; i < Math.min(answers.size(), 5); i++) {
             String answer = answers.get(i);
@@ -298,6 +353,7 @@ public class TicketButton extends ListenerAdapter {
                         ActionRow.of(Button.danger("ticket:staff:delete", "Delete ticket")))
                 .queue(
                         ignored -> {
+                            TicketLog.opened(guild, member, ticket);
                             ConsoleLogger.logConsole("TICKET_CREATED ticketId=" + ticket.id
                                     + " channelId=" + ticket.channelId
                                     + " user=\"" + member.getUser().getName() + "\" userId=" + member.getId()
@@ -382,7 +438,8 @@ public class TicketButton extends ListenerAdapter {
                 event.reply("This channel isn't an active ticket.").setEphemeral(true).queue();
                 return;
             }
-            TicketPermissions.Action required = TicketPermissions.Action.fromName(action);
+            TicketPermissions.Action required = TicketPermissions.Action.fromName(
+                    "deleteconfirm".equals(action) ? "delete" : action);
             if (required == null) {
                 event.reply("Unknown ticket control.").setEphemeral(true).queue();
                 return;
@@ -407,7 +464,15 @@ public class TicketButton extends ListenerAdapter {
             }
 
             if ("delete".equals(action)) {
-                event.deferReply(true).queue(hook -> new TranscriptManager().sendThenDelete(
+                event.reply(DELETE_PROMPT)
+                        .addComponents(deleteConfirmRow())
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            if ("deleteconfirm".equals(action)) {
+                event.deferEdit().queue(hook -> new TranscriptManager().sendThenDelete(
                         channel, ticket, hook, () -> {
                             // The reply lives in the deleted channel, so it can't be edited anymore
                             // (Discord answers 10008 Unknown Message).

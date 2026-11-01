@@ -141,6 +141,7 @@ public class TicketManager {
             channel.upsertPermissionOverride(creator).deny(Permission.MESSAGE_SEND).queue();
         }
 
+        TicketLog.fromEmbed(guild, TicketLog.Kind.CLOSED, ticket, channel, embed);
         channel.sendMessageEmbeds(embed.build())
                 .addComponents(ActionRow.of(Button.success("ticket:reopen", "Reopen ticket")))
                 .queue();
@@ -172,6 +173,7 @@ public class TicketManager {
         if (creator != null) {
             channel.upsertPermissionOverride(creator).grant(Permission.MESSAGE_SEND).queue();
         }
+        TicketLog.fromEmbed(guild, TicketLog.Kind.REOPENED, ticket, channel, embed);
         channel.sendMessageEmbeds(embed.build())
                 .addComponents(ActionRow.of(Button.danger("ticket:close", "Close ticket")))
                 .queue();
@@ -211,6 +213,7 @@ public class TicketManager {
             return "DATABASE_ERROR";
         }
 
+        TicketLog.fromEmbed(guild, TicketLog.Kind.CLAIMED, ticket, channel, embed);
         channel.sendMessageEmbeds(embed.build()).queue();
 
         return "SUCCESS";
@@ -248,6 +251,7 @@ public class TicketManager {
             return "DATABASE_ERROR";
         }
 
+        TicketLog.fromEmbed(guild, TicketLog.Kind.UNCLAIMED, ticket, channel, embed);
         channel.sendMessageEmbeds(embed.build()).queue();
 
         return "SUCCESS";
@@ -288,6 +292,7 @@ public class TicketManager {
             return "DATABASE_ERROR";
         }
 
+        TicketLog.fromEmbed(guild, TicketLog.Kind.TRANSFERRED, ticket, channel, embed);
         channel.sendMessageEmbeds(embed.build()).queue();
 
         return "SUCCESS";
