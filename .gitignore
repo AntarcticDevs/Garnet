@@ -3,3 +3,5 @@ garnet.db
 .vscode/
 .env
 config.yml
+data/
+logs/

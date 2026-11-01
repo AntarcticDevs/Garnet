@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import database.Database;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.events.interaction.command.CommandAutoCompleteInteractionEvent;
@@ -111,7 +112,7 @@ public class Rules extends ListenerAdapter implements Command {
 
             event.reply("Selected " + embedNames.size() + " embed(s) as this server's rules.").queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Rules.onSlashCommandInteraction failed", exception);
             event.reply("Something went wrong while saving the rules embed.").setEphemeral(true).queue();
         }
     }
@@ -147,7 +148,7 @@ public class Rules extends ListenerAdapter implements Command {
 
             event.replyChoices(choices).queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("Rules.onCommandAutoCompleteInteraction failed", exception);
             event.replyChoices(List.of()).queue();
         }
     }

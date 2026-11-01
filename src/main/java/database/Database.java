@@ -1,5 +1,9 @@
 package database;
 
+import config.ConfigManager;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -9,15 +13,52 @@ import java.util.List;
 
 import java.sql.PreparedStatement;
 import tickets.TicketData;
+import utils.Log;
 import tickets.TicketPanelData;
 import tickets.TicketQuestion;
 
 public class Database {
 
-    private static final String URL = "jdbc:sqlite:garnet.db";
+    private static final Path LEGACY_FILE = Path.of("garnet.db");
+    private static final Path DEFAULT_FILE = Path.of("data", "garnet.db");
+
+    private static String url;
+
+    /**
+     * Where the database lives: {@code database-path} from config.yml when set; otherwise
+     * {@code data/garnet.db}, except that a bot which already has a {@code garnet.db} next to its jar
+     * (older versions) keeps using that file, so updating never "loses" its data.
+     */
+    private static synchronized String url() {
+        if (url != null) {
+            return url;
+        }
+        Path file;
+        String configured = ConfigManager.getString("database-path");
+        if (configured != null) {
+            file = Path.of(configured);
+        } else if (Files.exists(LEGACY_FILE) && !Files.exists(DEFAULT_FILE)) {
+            file = LEGACY_FILE;
+            Log.info("Using the existing database garnet.db. To move it into the data folder, stop the bot, "
+                    + "move the file to data/garnet.db and start the bot again.");
+        } else {
+            file = DEFAULT_FILE;
+        }
+        Path parent = file.toAbsolutePath().getParent();
+        if (parent != null) {
+            try {
+                Files.createDirectories(parent);
+            } catch (IOException exception) {
+                Log.error("Couldn't create the database folder " + parent, exception);
+            }
+        }
+        Log.info("Database: " + file);
+        url = "jdbc:sqlite:" + file;
+        return url;
+    }
 
     public static Connection getConnection() throws SQLException {
-        Connection connection = DriverManager.getConnection(URL);
+        Connection connection = DriverManager.getConnection(url());
         try (Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA foreign_keys = ON");
         }

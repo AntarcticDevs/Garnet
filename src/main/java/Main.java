@@ -1,3 +1,4 @@
+import utils.Log;
 import config.ConfigManager;
 import commands.Help;
 import events.ConsoleActivityLogger;
@@ -49,7 +50,7 @@ public class Main {
         try {
                 Database.initialize();
         } catch (SQLException e) {
-            e.printStackTrace();
+            Log.error("Main.main failed", e);
         }
 
         // Help and the activity logger are always on; every other feature is a module that can be

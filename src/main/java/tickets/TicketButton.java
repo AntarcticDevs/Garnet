@@ -1,5 +1,6 @@
 package tickets;
 
+import utils.Log;
 import java.sql.SQLException;
 
 import database.Database;
@@ -117,7 +118,7 @@ public class TicketButton extends ListenerAdapter {
                                     + " by " + event.getUser().getAsMention() + "."));
             replyStaffResult(event, result, "Ticket transferred to " + target.getAsMention() + ".");
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.replyStaffResult failed", exception);
             event.reply("Couldn't load the ticket record or staff settings.")
                     .setEphemeral(true)
                     .queue();
@@ -182,7 +183,7 @@ public class TicketButton extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.onStringSelectInteraction failed", exception);
             event.reply("Couldn't load the ticket settings. Please try again.")
                     .setEphemeral(true)
                     .queue();
@@ -213,7 +214,7 @@ public class TicketButton extends ListenerAdapter {
                         List.of(),
                         message -> hook.editOriginal(message).queue());
             } catch (SQLException | RuntimeException exception) {
-                exception.printStackTrace();
+                Log.error("TicketButton.createTicket failed", exception);
                 hook.editOriginal("Couldn't create your ticket. Please try again or contact a server moderator.")
                         .queue();
             }
@@ -308,7 +309,7 @@ public class TicketButton extends ListenerAdapter {
     }
 
     private void reportTicketCreationFailure(Throwable exception, Consumer<String> completion) {
-        exception.printStackTrace();
+        Log.error("TicketButton.reportTicketCreationFailure failed", exception);
         if (exception instanceof IllegalArgumentException) {
             completion.accept(exception.getMessage());
         } else if (exception instanceof InsufficientPermissionException) {
@@ -365,7 +366,7 @@ public class TicketButton extends ListenerAdapter {
                     event.getGuild(), event.getMember(), panelData, categoryName, prompts, answers,
                     message -> hook.editOriginal(message).queue()));
         } catch (NumberFormatException | SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.submitTicketForm failed", exception);
             event.reply("Couldn't load the ticket form settings. Please try again.").setEphemeral(true).queue();
         }
     }
@@ -412,10 +413,9 @@ public class TicketButton extends ListenerAdapter {
                             // (Discord answers 10008 Unknown Message).
                             try {
                                 Database.deleteTicketByChannelId(channel.getId());
-                                System.out.println("Ticket deleted successfully.");
+                                Log.info("Ticket channel " + channel.getId() + " deleted.");
                             } catch (SQLException exception) {
-                                System.err.println("Channel deleted, but ticket record removal failed.");
-                                exception.printStackTrace();
+                                Log.error("Channel deleted, but ticket record removal failed.", exception);
                             }
                         }));
                 return;
@@ -429,22 +429,18 @@ public class TicketButton extends ListenerAdapter {
                         new TranscriptManager().sendTranscript(channel, hook)
                                 .whenComplete((ignored, error) -> {
                                     if (error != null) {
-                                        System.err.println("Transcript generation failed:");
-                                        error.printStackTrace();
+                                        Log.error("Transcript generation failed", error);
                                         hook.editOriginal("Couldn't create or upload the transcript.")
                                                 .queue(null, editError ->
-                                                        System.err.println(
-                                                                "Failed to send transcript error message: "
-                                                                        + editError));
+                                                        Log.warn("Failed to send transcript error message: "
+                                                                + editError));
                                     }
                                 });
                     } catch (RuntimeException exception) {
-                        System.err.println("Transcript generation failed:");
-                        exception.printStackTrace();
+                        Log.error("Transcript generation failed", exception);
                         hook.editOriginal("Couldn't create the transcript.")
                                 .queue(null, error ->
-                                        System.err.println(
-                                                "Failed to send transcript error message: " + error));
+                                        Log.warn("Failed to send transcript error message: " + error));
                     }
                 });
                 return;
@@ -464,7 +460,7 @@ public class TicketButton extends ListenerAdapter {
                 event.reply("Unknown ticket control.").setEphemeral(true).queue();
             }
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.replyStaffResult failed", exception);
             event.reply("Couldn't load the ticket record.").setEphemeral(true).queue();
         }
     }
@@ -534,7 +530,7 @@ public class TicketButton extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.closeTicket failed", exception);
             event.reply("Couldn't close this ticket because its data couldn't be saved.")
                     .setEphemeral(true)
                     .queue();
@@ -580,7 +576,7 @@ public class TicketButton extends ListenerAdapter {
                     .setEphemeral(true)
                     .queue();
         } catch (SQLException exception) {
-            exception.printStackTrace();
+            Log.error("TicketButton.reopenTicket failed", exception);
             event.reply("Couldn't reopen this ticket because its data couldn't be saved.")
                     .setEphemeral(true)
                     .queue();

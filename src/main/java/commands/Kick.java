@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -74,7 +75,7 @@ public class Kick extends ListenerAdapter implements Command {
                 target.kick().reason(reason).queue(
                         ignored -> hook.sendMessage("Kicked " + target.getUser().getAsMention() + ".").queue(),
                         error -> {
-                            error.printStackTrace();
+                            Log.error("Kick.onSlashCommandInteraction failed", error);
                             hook.sendMessage("I couldn't kick that member. Check my permissions and role hierarchy.")
                                     .queue();
                         }

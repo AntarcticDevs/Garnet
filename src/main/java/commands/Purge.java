@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -74,7 +75,7 @@ public class Purge extends ListenerAdapter implements Command {
 
                     deleteMessages(channel, messages, hook);
                 }, error -> {
-                    error.printStackTrace();
+                    Log.error("Purge.deleteMessages failed", error);
                     hook.sendMessage("I couldn't read the message history. Check that I can view this channel.")
                             .queue();
                 })
@@ -90,7 +91,7 @@ public class Purge extends ListenerAdapter implements Command {
             messages.get(0).delete().queue(
                     ignored -> hook.sendMessage("Deleted 1 message.").queue(),
                     error -> {
-                        error.printStackTrace();
+                        Log.error("Purge.deleteMessages failed", error);
                         hook.sendMessage("I couldn't delete that message. Check my channel permissions.")
                                 .queue();
                     }
@@ -101,7 +102,7 @@ public class Purge extends ListenerAdapter implements Command {
         channel.deleteMessages(messages).queue(
                 ignored -> hook.sendMessage("Deleted " + messages.size() + " messages.").queue(),
                 error -> {
-                    error.printStackTrace();
+                    Log.error("Purge.deleteMessages failed", error);
                     hook.sendMessage("I couldn't delete those messages. Check my channel permissions and try again.")
                             .queue();
                 }

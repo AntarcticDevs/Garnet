@@ -1,5 +1,6 @@
 package commands;
 
+import utils.Log;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
@@ -72,7 +73,7 @@ public class Ban extends ListenerAdapter implements Command {
                         .queue(
                                 ignored -> hook.sendMessage("Banned " + user.getAsMention() + ".").queue(),
                                 error -> {
-                                    error.printStackTrace();
+                                    Log.error("Ban.onSlashCommandInteraction failed", error);
                                     hook.sendMessage("I couldn't ban that user. Check my permissions and role hierarchy.")
                                             .queue();
                                 }
