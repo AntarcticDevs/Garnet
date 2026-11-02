@@ -1,5 +1,6 @@
 package modules;
 
+import commands.Activity;
 import commands.Avatar;
 import commands.Ban;
 import commands.Embeds;
@@ -26,8 +27,8 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 public enum BotModule {
-    INFORMATION("information", "/ping, /info, /userinfo, /avatar",
-            () -> List.<ListenerAdapter>of(new Ping(), new Info(), new UserInfo(), new Avatar())),
+    INFORMATION("information", "/ping, /info, /userinfo, /avatar, /activity",
+            () -> List.<ListenerAdapter>of(new Ping(), new Info(), new UserInfo(), new Avatar(), new Activity())),
     MODERATION("moderation", "/ban, /kick, /purge",
             () -> List.<ListenerAdapter>of(new Ban(), new Kick(), new Purge())),
     REACTION_ROLES("reaction-roles", "/reaction-roles and persistent reaction role assignments",
