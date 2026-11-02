@@ -283,6 +283,10 @@ public class Database {
                     )
                     """);
 
+            // Where the message lives, so /reaction-roles list can link to it. Rows made earlier have none.
+            addColumnIfMissing(connection, "reaction_roles", "channel_id TEXT");
+            addColumnIfMissing(connection, "reaction_role_buttons", "channel_id TEXT");
+
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
             // Existing servers keep pinging the joiner, as before.
             addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
@@ -297,21 +301,78 @@ public class Database {
     }
 
     /** Saves or replaces the role assigned by one emoji reaction on a message. */
-    public static void saveReactionRole(String guildId, String messageId, String emoji, String roleId)
-            throws SQLException {
+    public static void saveReactionRole(String guildId, String channelId, String messageId, String emoji,
+            String roleId) throws SQLException {
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
-                        INSERT INTO reaction_roles (guild_id, message_id, emoji, role_id)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO reaction_roles (guild_id, message_id, emoji, role_id, channel_id)
+                        VALUES (?, ?, ?, ?, ?)
                         ON CONFLICT (guild_id, message_id, emoji)
-                        DO UPDATE SET role_id = excluded.role_id
+                        DO UPDATE SET role_id = excluded.role_id, channel_id = excluded.channel_id
                         """)) {
             statement.setString(1, guildId);
             statement.setString(2, messageId);
             statement.setString(3, emoji);
             statement.setString(4, roleId);
+            statement.setString(5, channelId);
             statement.executeUpdate();
         }
+    }
+
+    /** One saved reaction or button role, for /reaction-roles list. {@code kind} is "reaction" or "button". */
+    public record ReactionRoleEntry(String kind, String channelId, String messageId, String key, String roleId) {
+    }
+
+    public static List<ReactionRoleEntry> listReactionRoles(String guildId) throws SQLException {
+        List<ReactionRoleEntry> entries = new java.util.ArrayList<>();
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        SELECT 'reaction' AS kind, channel_id, message_id, emoji AS entry_key, role_id
+                        FROM reaction_roles WHERE guild_id = ?
+                        UNION ALL
+                        SELECT 'button', channel_id, message_id, button_id, role_id
+                        FROM reaction_role_buttons WHERE guild_id = ?
+                        ORDER BY message_id
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, guildId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    entries.add(new ReactionRoleEntry(resultSet.getString("kind"),
+                            resultSet.getString("channel_id"), resultSet.getString("message_id"),
+                            resultSet.getString("entry_key"), resultSet.getString("role_id")));
+                }
+            }
+        }
+        return entries;
+    }
+
+    /** Removes the reaction mapping of one emoji; false when there was none. */
+    public static boolean deleteReactionRole(String guildId, String messageId, String emoji) throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM reaction_roles WHERE guild_id = ? AND message_id = ? AND emoji = ?")) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, emoji);
+            return statement.executeUpdate() > 0;
+        }
+    }
+
+    /** Removes every reaction and button mapping of a message; returns how many were removed. */
+    public static int deleteReactionRolesForMessage(String guildId, String messageId) throws SQLException {
+        int removed = 0;
+        try (Connection connection = getConnection()) {
+            for (String table : new String[] {"reaction_roles", "reaction_role_buttons"}) {
+                try (PreparedStatement statement = connection.prepareStatement(
+                        "DELETE FROM " + table + " WHERE guild_id = ? AND message_id = ?")) {
+                    statement.setString(1, guildId);
+                    statement.setString(2, messageId);
+                    removed += statement.executeUpdate();
+                }
+            }
+        }
+        return removed;
     }
 
     /** Returns the role configured for this reaction, or {@code null} when it is not configured. */
@@ -331,19 +392,20 @@ public class Database {
     }
 
     /** Saves the role assigned by a button on a message. */
-    public static void saveReactionRoleButton(String guildId, String messageId, String buttonId, String roleId)
-            throws SQLException {
+    public static void saveReactionRoleButton(String guildId, String channelId, String messageId, String buttonId,
+            String roleId) throws SQLException {
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
-                        INSERT INTO reaction_role_buttons (guild_id, message_id, button_id, role_id)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO reaction_role_buttons (guild_id, message_id, button_id, role_id, channel_id)
+                        VALUES (?, ?, ?, ?, ?)
                         ON CONFLICT (guild_id, message_id, button_id)
-                        DO UPDATE SET role_id = excluded.role_id
+                        DO UPDATE SET role_id = excluded.role_id, channel_id = excluded.channel_id
                         """)) {
             statement.setString(1, guildId);
             statement.setString(2, messageId);
             statement.setString(3, buttonId);
             statement.setString(4, roleId);
+            statement.setString(5, channelId);
             statement.executeUpdate();
         }
     }

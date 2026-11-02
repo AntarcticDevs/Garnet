@@ -159,15 +159,22 @@ banned someone.
 
 ## Reaction roles
 
-In the channel containing the target message, run `/reaction-roles` and choose a style:
+`/reaction-roles add` puts a role on any message, either as a reaction or as a button. It needs Manage Server,
+and you can only use roles below your own highest role.
 
-- **Emoji reaction:** provide an emoji, role and message ID. Garnet adds the reaction, gives the role
-  when a member reacts, and removes it when they remove their reaction.
-- **Button:** provide a role and message ID; an optional emoji and label customize the button. Clicking
-  the button toggles the role. The message must have been sent by this bot.
+- **Emoji reaction:** give an emoji, a role and the message ID. Garnet adds the reaction, gives the role
+  when a member reacts, and takes it away when they remove their reaction. (Discord has no private replies
+  to reactions, so there is no confirmation message for this style.)
+- **Button:** give a role and the message ID; an optional emoji and label customise the button. Each click toggles
+  the role and answers with a private message only that member sees. Buttons can only be added to messages the
+  bot sent itself, for example one made with `/embed send`.
 
-Both styles are saved in `garnet.db` and continue working after restarts. The command needs Manage Server;
-Garnet needs Manage Roles, Add Reactions for emoji style, and its highest role must be above the role it assigns.
+The message is looked up in the channel you run the command in, or the channel you pick with `channel`.
+`/reaction-roles list` shows everything that is set up, and `/reaction-roles remove message-id [emoji]` removes one
+emoji or all roles on a message. Roles are forgotten automatically when their message is deleted.
+
+Garnet needs Manage Roles, Add Reactions (emoji style), and its highest role must be above the roles it assigns.
+Roles are stored in `data/garnet.db` and keep working after restarts.
 
 ## Troubleshooting
 
