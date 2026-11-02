@@ -13,6 +13,7 @@ import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandGroupData;
+import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import utils.EmbedManager;
 import net.dv8tion.jda.api.EmbedBuilder;
@@ -39,7 +40,8 @@ public class Embeds extends ListenerAdapter implements Command {
                             .addOptions(embedNameOption()),
                         new SubcommandData("send", "Send an embed")
                             .addOptions(embedNameOption())
-                            .addOption(OptionType.CHANNEL, "channel", "The channel where the embed will be sent in.", false)
+                            .addOptions(new OptionData(OptionType.CHANNEL, "channel", "The channel to send the embed in (default: this channel)", false)
+                                .setChannelTypes(ChannelType.TEXT, ChannelType.NEWS))
                 )
                 .addSubcommandGroups(
                         new SubcommandGroupData("edit", "Edit an embed")
@@ -100,11 +102,12 @@ public class Embeds extends ListenerAdapter implements Command {
         } else if ("send".equals(event.getSubcommandName())) {
 
             OptionMapping option = event.getOption("channel");
-            if (option != null) {
-                MessageChannel channel = option.getAsChannel().asGuildMessageChannel();
+            if (option == null) {
+                sendEmbed(event, null);
+            } else if (option.getAsChannel() instanceof MessageChannel channel) {
                 sendEmbed(event, channel);
             } else {
-                sendEmbed(event, null);
+                event.reply("Please choose a text channel.").setEphemeral(true).queue();
             }
         }
     }
@@ -253,7 +256,7 @@ public class Embeds extends ListenerAdapter implements Command {
 
 
 
-    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) {
+    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) { // USE null FOR THE SECOND PARAMETER TO JUST REPLY TO USER MY FUTURE SELFF
         if (event.getGuild() == null) {
             event.reply("This command can only be used in a server.")
                     .setEphemeral(true)
