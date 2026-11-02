@@ -263,6 +263,16 @@ public class Database {
                     )
                         """);
 
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS reaction_roles (
+                    guild_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    emoji TEXT NOT NULL,
+                    role_id TEXT NOT NULL,
+                    PRIMARY KEY (guild_id, message_id, emoji)
+                    )
+                    """);
+
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
             // Existing servers keep pinging the joiner, as before.
             addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
@@ -273,6 +283,40 @@ public class Database {
                     INSERT OR IGNORE INTO guild_rule_embeds (guild_id, position, embed_id)
                     SELECT guild_id, 1, embed_id FROM guild_rules
                     """);
+        }
+    }
+
+    /** Saves or replaces the role assigned by one emoji reaction on a message. */
+    public static void saveReactionRole(String guildId, String messageId, String emoji, String roleId)
+            throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO reaction_roles (guild_id, message_id, emoji, role_id)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT (guild_id, message_id, emoji)
+                        DO UPDATE SET role_id = excluded.role_id
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, emoji);
+            statement.setString(4, roleId);
+            statement.executeUpdate();
+        }
+    }
+
+    /** Returns the role configured for this reaction, or {@code null} when it is not configured. */
+    public static String getReactionRole(String guildId, String messageId, String emoji) throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        SELECT role_id FROM reaction_roles
+                        WHERE guild_id = ? AND message_id = ? AND emoji = ?
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, emoji);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getString("role_id") : null;
+            }
         }
     }
 

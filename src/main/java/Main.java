@@ -84,7 +84,7 @@ public class Main {
         JDA jda;
         try {
             jda = JDABuilder.createDefault(token)
-                    .enableIntents(GatewayIntent.GUILD_MEMBERS)
+                    .enableIntents(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS)
                     .addEventListeners(listeners.toArray())
                     .build()
                     .awaitReady();

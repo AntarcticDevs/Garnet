@@ -7,6 +7,7 @@ import commands.Info;
 import commands.Kick;
 import commands.Ping;
 import commands.Purge;
+import commands.ReactionRoles;
 import commands.Rules;
 import commands.Ticket;
 import commands.UserInfo;
@@ -39,6 +40,8 @@ public enum BotModule {
             () -> List.<ListenerAdapter>of(new Ping(), new Info(), new UserInfo(), new Avatar())),
     MODERATION("moderation", "/ban, /kick, /purge",
             () -> List.<ListenerAdapter>of(new Ban(), new Kick(), new Purge())),
+    REACTION_ROLES("reaction-roles", "/reaction-roles and persistent reaction role assignments",
+            () -> List.<ListenerAdapter>of(new ReactionRoles())),
     TICKETS("tickets", "ticket panels, ticket channels and transcripts",
             () -> List.<ListenerAdapter>of(new Ticket(), new TicketButton(), new TicketPanelEditor())),
     WELCOMER("welcomer", "welcome messages for new members",

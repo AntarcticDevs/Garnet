@@ -39,6 +39,7 @@ public class ConfigManager {
             modules:
               information: true   # /ping, /info, /userinfo, /avatar
               moderation: true    # /ban, /kick, /purge
+              reaction-roles: true # /reaction-roles
               tickets: true       # ticket panels, ticket channels and transcripts
               welcomer: true      # welcome messages for new members
               embeds: true        # /embed and /rules

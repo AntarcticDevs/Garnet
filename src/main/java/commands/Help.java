@@ -26,11 +26,7 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * /help: an overview of what this bot can do, with a menu to browse each feature.
- * Only features that are switched on in config.yml (modules:) are listed, so every host gets a help
- * page that matches their own bot.
- */
+
 public class Help extends ListenerAdapter implements Command {
 
     private static final String MENU_ID = "help:page";
@@ -55,6 +51,12 @@ public class Help extends ListenerAdapter implements Command {
                     `/purge amount` Deletes up to 100 recent messages. *Needs Manage Messages.*
                     `/kick user [reason]` Kicks a member. *Needs Kick Members.*
                     `/ban user [reason]` Bans a user. *Needs Ban Members.*"""),
+            new Page(BotModule.REACTION_ROLES, "reaction-roles", "🎭", "Reaction roles",
+                    "Give members a role when they react to a message",
+                    """
+                    `/reaction-roles emoji role message-id` Adds the emoji to a message in the current channel
+                    and saves the role mapping. Members get the role when they react and lose it when they
+                    remove their reaction. *Needs Manage Server; the bot needs Manage Roles.*"""),
             new Page(BotModule.TICKETS, "tickets", "🎫", "Tickets",
                     "Panels, private ticket channels and transcripts",
                     """
@@ -103,7 +105,6 @@ public class Help extends ListenerAdapter implements Command {
         if (!event.getName().equals("help")) {
             return;
         }
-        // Ephemeral, so the menu belongs to whoever asked instead of changing a message everyone sees.
         event.reply(new MessageCreateBuilder()
                         .useComponentsV2()
                         .addComponents(build(event.getJDA(), OVERVIEW))

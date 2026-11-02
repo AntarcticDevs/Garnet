@@ -2,7 +2,7 @@
 
 Garnet is a self-hosted Discord bot engine written in Java. You run one jar, it creates its own
 `config.yml`, you paste in your bot token, and you have your own bot with tickets, logging,
-moderation, embeds and a welcomer. Every feature can be switched on or off in the config.
+moderation, reaction roles, embeds and a welcomer. Every feature can be switched on or off in the config.
 
 > Garnet is under active development. Run it on a test server first and keep backups of `data/`.
 
@@ -13,6 +13,7 @@ moderation, embeds and a welcomer. Every feature can be switched on or off in th
 | **Tickets** | Panels with a button or category dropdown, per-category forms, claim / transfer / close / reopen, delete confirmation, transcripts, per-member limits, welcome message per panel, and a panel editor inside Discord |
 | **Logging** | `/logs` sets a log channel for tickets, members, moderation, server changes and (optionally) voice |
 | **Moderation** | `/ban`, `/kick`, `/purge` |
+| **Reaction roles** | `/reaction-roles` assigns a role when a member reacts to a message; mappings survive restarts |
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
@@ -82,6 +83,7 @@ database-path: ''         # blank = data/garnet.db
 modules:                  # true = on, false = off
   information: true
   moderation: true
+  reaction-roles: true
   tickets: true
   welcomer: true
   embeds: true
@@ -103,13 +105,13 @@ help-thumbnail-url: ''    # blank = the bot's avatar
 | Path | Contents |
 | --- | --- |
 | `config.yml` | Your settings |
-| `data/garnet.db` | Everything the bot saves (panels, tickets, embeds, log settings). **Back this up.** |
+| `data/garnet.db` | Everything the bot saves (panels, tickets, embeds, reaction roles, log settings). **Back this up.** |
 | `logs/latest.log` | This run's log. `previous.log` is the run before. Send `latest.log` when asking for help. |
 
 ## Updating
 
 Stop the bot, replace the jar, start it again. New versions add database columns and tables on startup
-and never remove existing data, so panels, tickets and embeds carry over.
+and never remove existing data, so panels, tickets, embeds and reaction roles carry over.
 
 A bot from an older version that has `garnet.db` next to the jar keeps using that file. To move it into the
 data folder, stop the bot, move the file to `data/garnet.db` and start it again (or set `database-path`).
@@ -154,6 +156,13 @@ transcript, so a ticket is not deleted if the transcript could not be posted.
 
 The bot needs View Channel, Send Messages and Embed Links in the log channel, and View Audit Log to show who
 banned someone.
+
+## Reaction roles
+
+In the channel containing the target message, run `/reaction-roles emoji role message-id`. Garnet adds
+the emoji to that message, saves the mapping in `garnet.db`, gives the role to members who react, and
+removes it when they remove their reaction. The command needs Manage Server; Garnet needs Manage Roles,
+Add Reactions, View Channel and Read Message History, and its highest role must be above the role it assigns.
 
 ## Troubleshooting
 
