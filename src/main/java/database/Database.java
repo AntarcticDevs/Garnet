@@ -264,6 +264,10 @@ public class Database {
                         """);
 
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
+            // Existing servers keep pinging the joiner, as before.
+            addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
+            // Existing servers keep welcoming new members.
+            addColumnIfMissing(connection, "welcomer", "enabled INTEGER NOT NULL DEFAULT 1");
 
             statement.execute("""
                     INSERT OR IGNORE INTO guild_rule_embeds (guild_id, position, embed_id)

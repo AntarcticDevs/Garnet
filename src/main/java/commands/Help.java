@@ -77,7 +77,10 @@ public class Help extends ListenerAdapter implements Command {
                     """
                     `/welcomer setchannel channel` Where welcome messages go.
                     `/welcomer setembed` Choose which saved embed is used.
-                    `/welcomer test [user]` Sends a test welcome message."""),
+                    `/welcomer ping on/off` Whether the welcome message mentions the new member.
+                    `/welcomer enable`, `disable` Turn welcome messages on or off (settings are kept).
+                    `/welcomer test [user]` Sends a test welcome message.
+                    *Needs Manage Server.* Placeholders for the embed: `{user}` `{user_mention}` `{server}` `{member_count}`."""),
             new Page(BotModule.EMBEDS, "embeds", "🧩", "Embeds & rules",
                     "Build and send custom embeds, set the rules",
                     """

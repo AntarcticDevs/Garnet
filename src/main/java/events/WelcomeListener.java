@@ -7,6 +7,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
@@ -44,7 +46,13 @@ public class WelcomeListener extends ListenerAdapter implements Command {
                     .addOption(OptionType.USER, "user", "The user to welcome", false),
                 new SubcommandData("setchannel", "Sets the welcome channel")
                     .addOption(OptionType.CHANNEL, "channel", "The channel for welcome messages", true),
-                new SubcommandData("setembed", "Choose the welcome embed")
+                new SubcommandData("setembed", "Choose the welcome embed"),
+                new SubcommandData("enable", "Turn welcome messages on"),
+                new SubcommandData("disable", "Turn welcome messages off (your settings are kept)"),
+                new SubcommandData("ping", "Choose whether the welcome message pings the new member")
+                    .addOptions(new OptionData(OptionType.STRING, "mode", "on or off", true)
+                        .addChoice("on", "on")
+                        .addChoice("off", "off"))
             );
     }
 
@@ -58,6 +66,13 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         Guild guild = event.getGuild();
         if (guild == null || !componentId.equals("welcomer:setembed:" + guild.getId())) {
             event.reply("This welcome embed menu is not for this server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if (event.getMember() == null || !event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("You need the Manage Server permission to change the welcome message.")
                     .setEphemeral(true)
                     .queue();
             return;
@@ -139,6 +154,48 @@ public class WelcomeListener extends ListenerAdapter implements Command {
             return;
         }
 
+        if (!event.getMember().hasPermission(Permission.MANAGE_SERVER)) {
+            event.reply("You need the Manage Server permission to use /welcomer.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if ("enable".equals(event.getSubcommandName()) || "disable".equals(event.getSubcommandName())) {
+            boolean enable = "enable".equals(event.getSubcommandName());
+            try {
+                saveWelcomeEnabled(event.getGuild(), enable);
+                String note = enable && getWelcomeChannel(event.getGuild()) == null
+                        ? " Set a channel with `/welcomer setchannel` so I know where to send them."
+                        : "";
+                event.reply(enable
+                                ? "Welcome messages are on." + note
+                                : "Welcome messages are off. Your channel and embed are kept; `/welcomer enable` turns them back on.")
+                        .setEphemeral(true)
+                        .queue();
+            } catch (SQLException exception) {
+                Log.error("WelcomeListener.onSlashCommandInteraction failed", exception);
+                event.reply("Couldn't save that setting. Please try again.").setEphemeral(true).queue();
+            }
+            return;
+        }
+
+        if ("ping".equals(event.getSubcommandName())) {
+            boolean ping = "on".equals(event.getOption("mode").getAsString());
+            try {
+                saveWelcomePing(event.getGuild(), ping);
+                event.reply(ping
+                                ? "Welcome messages will mention the new member."
+                                : "Welcome messages will no longer mention the new member.")
+                        .setEphemeral(true)
+                        .queue();
+            } catch (SQLException exception) {
+                Log.error("WelcomeListener.onSlashCommandInteraction failed", exception);
+                event.reply("Couldn't save that setting. Please try again.").setEphemeral(true).queue();
+            }
+            return;
+        }
+
         if ("setchannel".equals(event.getSubcommandName())) {
             TextChannel channel = event.getOption("channel", option -> option.getAsChannel().asTextChannel());
             saveWelcomeChannel(event.getGuild(), channel);
@@ -165,7 +222,11 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         }
 
         if (sendWelcomeMessage(event.getGuild(), member)) {
-            event.reply("Welcome message sent!").setEphemeral(true).queue();
+            event.reply(isWelcomeEnabled(event.getGuild())
+                            ? "Welcome message sent!"
+                            : "Test welcome message sent. Welcome messages are currently **off**, so new members "
+                                    + "won't get one until you run `/welcomer enable`.")
+                    .setEphemeral(true).queue();
         } else {
             event.reply("No welcome channel has been configured. Use `/welcomer setchannel` first.")
                     .setEphemeral(true)
@@ -175,6 +236,9 @@ public class WelcomeListener extends ListenerAdapter implements Command {
 
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        if (!isWelcomeEnabled(event.getGuild())) {
+            return;
+        }
         sendWelcomeMessage(event.getGuild(), event.getMember());
     }
 
@@ -205,7 +269,11 @@ public class WelcomeListener extends ListenerAdapter implements Command {
             EmbedHelpers.setDefaultFooter(embed, guild);
         }
 
-        welcomeChannel.sendMessage(member.getUser().getAsMention()).setEmbeds(embed.build()).queue();
+        if (getWelcomePing(guild)) {
+            welcomeChannel.sendMessage(member.getUser().getAsMention()).setEmbeds(embed.build()).queue();
+        } else {
+            welcomeChannel.sendMessageEmbeds(embed.build()).queue();
+        }
         return true;
     }
 
@@ -257,6 +325,64 @@ public class WelcomeListener extends ListenerAdapter implements Command {
             statement.executeUpdate();
         } catch (SQLException exception) {
             throw new IllegalStateException("Could not save the welcome channel", exception);
+        }
+    }
+
+    private void saveWelcomePing(Guild guild, boolean ping) throws SQLException {
+        String sql = """
+                INSERT INTO welcomer (guild_id, ping)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET ping = excluded.ping
+                """;
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guild.getId());
+            statement.setInt(2, ping ? 1 : 0);
+            statement.executeUpdate();
+        }
+    }
+
+    private void saveWelcomeEnabled(Guild guild, boolean enabled) throws SQLException {
+        String sql = """
+                INSERT INTO welcomer (guild_id, enabled)
+                VALUES (?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET enabled = excluded.enabled
+                """;
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guild.getId());
+            statement.setInt(2, enabled ? 1 : 0);
+            statement.executeUpdate();
+        }
+    }
+
+    /** Whether new members get a welcome message. On unless a server turned it off. */
+    private boolean isWelcomeEnabled(Guild guild) {
+        String sql = "SELECT enabled FROM welcomer WHERE guild_id = ?";
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guild.getId());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return !resultSet.next() || resultSet.getInt("enabled") != 0;
+            }
+        } catch (SQLException exception) {
+            Log.error("WelcomeListener.isWelcomeEnabled failed", exception);
+            return true;
+        }
+    }
+
+    /** Whether the welcome message mentions the new member. On unless a server turned it off. */
+    private boolean getWelcomePing(Guild guild) {
+        String sql = "SELECT ping FROM welcomer WHERE guild_id = ?";
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guild.getId());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return !resultSet.next() || resultSet.getInt("ping") != 0;
+            }
+        } catch (SQLException exception) {
+            Log.error("WelcomeListener.getWelcomePing failed", exception);
+            return true;
         }
     }
 
