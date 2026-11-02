@@ -258,10 +258,14 @@ public class ReactionRoles extends ListenerAdapter implements Command {
                 continue;
             }
             ActionRow row = component.asActionRow();
-            List<ActionRowChildComponent> children = row.getComponents().stream()
-                    .filter(child -> !(child instanceof Button button && button.getCustomId() != null
-                            && buttonIds.contains(button.getCustomId())))
-                    .toList();
+            List<ActionRowChildComponent> children = new ArrayList<>();
+            for (ActionRowChildComponent child : row.getComponents()) {
+                boolean roleButton = child instanceof Button button && button.getCustomId() != null
+                        && buttonIds.contains(button.getCustomId());
+                if (!roleButton) {
+                    children.add(child);
+                }
+            }
             if (!children.isEmpty()) {
                 kept.add(row.withComponents(children));
             }
