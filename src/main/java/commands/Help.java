@@ -52,11 +52,13 @@ public class Help extends ListenerAdapter implements Command {
                     `/kick user [reason]` Kicks a member. *Needs Kick Members.*
                     `/ban user [reason]` Bans a user. *Needs Ban Members.*"""),
             new Page(BotModule.REACTION_ROLES, "reaction-roles", "🎭", "Reaction roles",
-                    "Give members a role when they react to a message",
+                    "Give members a role with a reaction or button",
                     """
-                    `/reaction-roles emoji role message-id` Adds the emoji to a message in the current channel
-                    and saves the role mapping. Members get the role when they react and lose it when they
-                    remove their reaction. *Needs Manage Server; the bot needs Manage Roles.*"""),
+                    `/reaction-roles style emoji role message-id [label]` Configures either an emoji reaction
+                    or a button on a message in the current channel. Emoji style adds the role on reaction and
+                    removes it when the reaction is removed; button style toggles the role when clicked.
+                    Button emoji and label are optional. Settings persist across restarts.
+                    *Needs Manage Server; the bot needs Manage Roles.*"""),
             new Page(BotModule.TICKETS, "tickets", "🎫", "Tickets",
                     "Panels, private ticket channels and transcripts",
                     """

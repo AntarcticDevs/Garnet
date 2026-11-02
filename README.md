@@ -13,7 +13,7 @@ moderation, reaction roles, embeds and a welcomer. Every feature can be switched
 | **Tickets** | Panels with a button or category dropdown, per-category forms, claim / transfer / close / reopen, delete confirmation, transcripts, per-member limits, welcome message per panel, and a panel editor inside Discord |
 | **Logging** | `/logs` sets a log channel for tickets, members, moderation, server changes and (optionally) voice |
 | **Moderation** | `/ban`, `/kick`, `/purge` |
-| **Reaction roles** | `/reaction-roles` assigns a role when a member reacts to a message; mappings survive restarts |
+| **Reaction roles** | Choose emoji-reaction or button-style role assignment with `/reaction-roles`; mappings survive restarts |
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
@@ -159,10 +159,15 @@ banned someone.
 
 ## Reaction roles
 
-In the channel containing the target message, run `/reaction-roles emoji role message-id`. Garnet adds
-the emoji to that message, saves the mapping in `garnet.db`, gives the role to members who react, and
-removes it when they remove their reaction. The command needs Manage Server; Garnet needs Manage Roles,
-Add Reactions, View Channel and Read Message History, and its highest role must be above the role it assigns.
+In the channel containing the target message, run `/reaction-roles` and choose a style:
+
+- **Emoji reaction:** provide an emoji, role and message ID. Garnet adds the reaction, gives the role
+  when a member reacts, and removes it when they remove their reaction.
+- **Button:** provide a role and message ID; an optional emoji and label customize the button. Clicking
+  the button toggles the role. The message must have been sent by this bot.
+
+Both styles are saved in `garnet.db` and continue working after restarts. The command needs Manage Server;
+Garnet needs Manage Roles, Add Reactions for emoji style, and its highest role must be above the role it assigns.
 
 ## Troubleshooting
 

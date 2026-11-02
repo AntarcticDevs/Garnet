@@ -273,6 +273,16 @@ public class Database {
                     )
                     """);
 
+            statement.execute("""
+                    CREATE TABLE IF NOT EXISTS reaction_role_buttons (
+                        guild_id TEXT NOT NULL,
+                        message_id TEXT NOT NULL,
+                        button_id TEXT NOT NULL,
+                        role_id TEXT NOT NULL,
+                        PRIMARY KEY (guild_id, message_id, button_id)
+                    )
+                    """);
+
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
             // Existing servers keep pinging the joiner, as before.
             addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
@@ -317,6 +327,56 @@ public class Database {
             try (ResultSet resultSet = statement.executeQuery()) {
                 return resultSet.next() ? resultSet.getString("role_id") : null;
             }
+        }
+    }
+
+    /** Saves the role assigned by a button on a message. */
+    public static void saveReactionRoleButton(String guildId, String messageId, String buttonId, String roleId)
+            throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        INSERT INTO reaction_role_buttons (guild_id, message_id, button_id, role_id)
+                        VALUES (?, ?, ?, ?)
+                        ON CONFLICT (guild_id, message_id, button_id)
+                        DO UPDATE SET role_id = excluded.role_id
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, buttonId);
+            statement.setString(4, roleId);
+            statement.executeUpdate();
+        }
+    }
+
+    /** Returns the role configured for this button, or {@code null} when it is not configured. */
+    public static String getReactionRoleButton(String guildId, String messageId, String buttonId)
+            throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        SELECT role_id FROM reaction_role_buttons
+                        WHERE guild_id = ? AND message_id = ? AND button_id = ?
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, buttonId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() ? resultSet.getString("role_id") : null;
+            }
+        }
+    }
+
+    /** Removes a button mapping if publishing its button to Discord fails. */
+    public static void deleteReactionRoleButton(String guildId, String messageId, String buttonId)
+            throws SQLException {
+        try (Connection connection = getConnection();
+                PreparedStatement statement = connection.prepareStatement("""
+                        DELETE FROM reaction_role_buttons
+                        WHERE guild_id = ? AND message_id = ? AND button_id = ?
+                        """)) {
+            statement.setString(1, guildId);
+            statement.setString(2, messageId);
+            statement.setString(3, buttonId);
+            statement.executeUpdate();
         }
     }
 
