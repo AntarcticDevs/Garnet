@@ -7,6 +7,7 @@ public enum LogCategory {
     MEMBERS("members", "Joins, leaves, nickname and role changes", true),
     MODERATION("moderation", "Bans, unbans, kicks and purges", true),
     SERVER("server", "Channels and roles created or deleted", true),
+    ROLES("roles", "Roles given or removed by role panels", true),
     VOICE("voice", "Voice channel joins, leaves and moves (noisy)", false);
 
     private final String key;
