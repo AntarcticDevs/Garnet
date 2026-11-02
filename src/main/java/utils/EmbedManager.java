@@ -115,19 +115,20 @@ public class EmbedManager {
             if (embed.footerText() != null) {
                 builder.setFooter(
                         replaceVariables(embed.footerText(), guild, member),
-                        embed.footerImage()
+                        replaceUrl(embed.footerImage(), guild, member)
                 );
             }
 
-            if (embed.imageUrl() != null) {
-                builder.setImage(embed.imageUrl());
+            String imageUrl = replaceUrl(embed.imageUrl(), guild, member);
+            if (imageUrl != null) {
+                builder.setImage(imageUrl);
             }
 
             if (embed.authorText() != null) {
                 builder.setAuthor(
                         replaceVariables(embed.authorText(), guild, member),
                         null,
-                        embed.authorImage()
+                        replaceUrl(embed.authorImage(), guild, member)
                 );
             }
 
@@ -135,8 +136,9 @@ public class EmbedManager {
                 builder.setColor(Color.decode(embed.colour()));
             }
 
-            if (embed.thumbnailUrl() != null) {
-                builder.setThumbnail(embed.thumbnailUrl());
+            String thumbnailUrl = replaceUrl(embed.thumbnailUrl(), guild, member);
+            if (thumbnailUrl != null) {
+                builder.setThumbnail(thumbnailUrl);
             }
 
             for (EmbedFieldData field : embed.fields()) {
@@ -181,6 +183,17 @@ public class EmbedManager {
             .replace("{user}", member.getUser().getName())
             .replace("{user_mention}", member.getAsMention())
             .replace("{server}", guild.getName())
-            .replace("{member_count}", String.valueOf(guild.getMemberCount()));
+            .replace("{member_count}", String.valueOf(guild.getMemberCount()))
+            .replace("{server_icon}", guild.getIconUrl() == null ? "" : guild.getIconUrl())
+            .replace("{member_avatar}", member.getEffectiveAvatarUrl());
 }
+
+    /**
+     * For image fields: fills in placeholders such as {server_icon} and {member_avatar}. A blank result
+     * (for example a server without an icon) means "no image" instead of an invalid link.
+     */
+    private static String replaceUrl(String url, Guild guild, Member member) {
+        String result = replaceVariables(url, guild, member);
+        return result == null || result.isBlank() ? null : result.trim();
+    }
 }
