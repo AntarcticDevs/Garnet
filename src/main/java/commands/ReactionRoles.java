@@ -48,9 +48,9 @@ public class ReactionRoles extends ListenerAdapter implements Command {
                 .setMaxLength(80);
         return Commands.slash("reaction-roles", "Set up a reaction or button role")
                 .addOptions(style)
-                .addOption(OptionType.STRING, "emoji", "Reaction emoji, or optional button icon", false)
                 .addOption(OptionType.ROLE, "role", "The role given to members", true)
                 .addOption(OptionType.STRING, "message-id", "The ID of the message in this channel", true)
+                .addOption(OptionType.STRING, "emoji", "Reaction emoji, or optional button icon", false)
                 .addOptions(label);
     }
 
