@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import utils.OrdinalUtils;
 
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
@@ -181,6 +182,7 @@ public class EmbedManager {
             .replace("{user}", member.getUser().getName())
             .replace("{user_mention}", member.getAsMention())
             .replace("{server}", guild.getName())
-            .replace("{member_count}", String.valueOf(guild.getMemberCount()));
+            .replace("{member_count}", String.valueOf(guild.getMemberCount()))
+            .replace("{member_count_ordinal}", String.valueOf(OrdinalUtils.ordinal(guild.getMemberCount())));
 }
 }
