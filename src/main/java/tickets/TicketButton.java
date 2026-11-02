@@ -294,6 +294,7 @@ public class TicketButton extends ListenerAdapter {
                     staffRoles,
                     pingRoles,
                     ticket -> {
+                        resetCategorySelection(guild, panelData);
                         try {
                             postTicketMessage(
                                     guild, member, panelData, categoryName, questions, answers, pingRoles, ticket,
@@ -305,6 +306,29 @@ public class TicketButton extends ListenerAdapter {
                     exception -> reportTicketCreationFailure(exception, completion));
         } catch (SQLException | RuntimeException exception) {
             reportTicketCreationFailure(exception, completion);
+        }
+    }
+
+    private void resetCategorySelection(
+            net.dv8tion.jda.api.entities.Guild guild,
+            TicketPanelData panelData) {
+        if (panelData == null || panelData.categories.isEmpty()) {
+            return;
+        }
+        try {
+            TicketPanelData currentPanelData = Database.getPanelDataById(guild.getId(), panelData.id);
+            if (currentPanelData == null || currentPanelData.categories.isEmpty()) {
+                return;
+            }
+            var update = new TicketPanel().editPublished(guild, currentPanelData);
+            if (update != null) {
+                update.queue(
+                        ignored -> {
+                        },
+                        error -> Log.error("TicketButton.resetCategorySelection failed", error));
+            }
+        } catch (SQLException exception) {
+            Log.error("TicketButton.resetCategorySelection failed", exception);
         }
     }
 
