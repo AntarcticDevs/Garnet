@@ -185,7 +185,7 @@ public class EmbedManager {
             .replace("{server}", guild.getName())
             .replace("{member_count}", String.valueOf(guild.getMemberCount()))
             .replace("{server_icon}", guild.getIconUrl() == null ? "" : guild.getIconUrl())
-            .replace("{member_avatar}", member.getEffectiveAvatarUrl());
+            .replace("{member_avatar}", member.getEffectiveAvatarUrl())
             .replace("{member_count_ordinal}", String.valueOf(OrdinalUtils.ordinal(guild.getMemberCount())));
 }
 
