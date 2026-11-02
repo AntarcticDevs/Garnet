@@ -2,7 +2,9 @@ package commands;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
@@ -23,12 +25,27 @@ public class Activity extends ListenerAdapter implements Command {
                                                 .addChoice("Competing", "competing")
                                                 .addChoice("Custom Status", "custom"),
                                         new OptionData(OptionType.STRING, "text", "Activity text", true)),
-                        new SubcommandData("reset", "Remove Garnet's activity"));
+                        new SubcommandData("reset", "Remove Garnet's activity"))
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.ADMINISTRATOR));
     }
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         if (!event.getName().equals("activity")) {
+            return;
+        }
+
+        if (event.getGuild() == null) {
+            event.reply("This command can only be used in a server.")
+                    .setEphemeral(true)
+                    .queue();
+            return;
+        }
+
+        if (event.getMember() == null || !event.getMember().hasPermission(Permission.ADMINISTRATOR)) {
+            event.reply("You need the Administrator permission to change the bot's activity.")
+                    .setEphemeral(true)
+                    .queue();
             return;
         }
 
