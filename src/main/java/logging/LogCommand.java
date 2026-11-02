@@ -17,7 +17,6 @@ import utils.Log;
 
 import java.sql.SQLException;
 
-/** /logs: choose the log channel and which kinds of events are posted there. */
 public class LogCommand extends ListenerAdapter implements Command {
 
     @Override

@@ -14,7 +14,6 @@ import java.util.List;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 
-
 public class EmbedManager {
 
     public static EmbedBuilder loadEmbed(Guild guild, Member member, String embedName) throws SQLException {
@@ -189,10 +188,6 @@ public class EmbedManager {
             .replace("{member_count_ordinal}", String.valueOf(OrdinalUtils.ordinal(guild.getMemberCount())));
 }
 
-    /**
-     * For image fields: fills in placeholders such as {server_icon} and {member_avatar}. A blank result
-     * (for example a server without an icon) means "no image" instead of an invalid link.
-     */
     private static String replaceUrl(String url, Guild guild, Member member) {
         String result = replaceVariables(url, guild, member);
         return result == null || result.isBlank() ? null : result.trim();

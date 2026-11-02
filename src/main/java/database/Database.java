@@ -24,11 +24,6 @@ public class Database {
 
     private static String url;
 
-    /**
-     * Where the database lives: {@code database-path} from config.yml when set; otherwise
-     * {@code data/garnet.db}, except that a bot which already has a {@code garnet.db} next to its jar
-     * (older versions) keeps using that file, so updating never "loses" its data.
-     */
     private static synchronized String url() {
         if (url != null) {
             return url;
@@ -122,7 +117,6 @@ public class Database {
             addColumnIfMissing(connection, "tickets", "category_name TEXT");
             addColumnIfMissing(connection, "tickets", "panel_id INTEGER");
 
-            ///////////////////////////////////// TICKET PANEL
             statement.execute("""
                     CREATE TABLE IF NOT EXISTS ticket_panels (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,7 +131,6 @@ public class Database {
                     )
                     """);
 
-            // Migrate databases created before newer ticket panel columns were added.
             addColumnIfMissing(connection, "ticket_panels", "total_categories INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "total_staff_roles INTEGER NOT NULL DEFAULT 0");
             addColumnIfMissing(connection, "ticket_panels", "total_ping_roles INTEGER NOT NULL DEFAULT 0");
@@ -223,7 +216,6 @@ public class Database {
                     )
                     """);
 
-            // Per-question settings. Existing questions keep the old behaviour: paragraph and required.
             addColumnIfMissing(connection, "ticket_panel_questions", "paragraph INTEGER NOT NULL DEFAULT 1");
             addColumnIfMissing(connection, "ticket_panel_questions", "required INTEGER NOT NULL DEFAULT 1");
             addColumnIfMissing(connection, "ticket_panel_questions", "placeholder TEXT");
@@ -283,14 +275,13 @@ public class Database {
                     )
                     """);
 
-            // Where the message lives, so /reaction-roles list can link to it. Rows made earlier have none.
             addColumnIfMissing(connection, "reaction_roles", "channel_id TEXT");
             addColumnIfMissing(connection, "reaction_role_buttons", "channel_id TEXT");
 
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
-            // Existing servers keep pinging the joiner, as before.
+
             addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
-            // Existing servers keep welcoming new members.
+
             addColumnIfMissing(connection, "welcomer", "enabled INTEGER NOT NULL DEFAULT 1");
 
             statement.execute("""
@@ -300,7 +291,6 @@ public class Database {
         }
     }
 
-    /** Saves or replaces the role assigned by one emoji reaction on a message. */
     public static void saveReactionRole(String guildId, String channelId, String messageId, String emoji,
             String roleId) throws SQLException {
         try (Connection connection = getConnection();
@@ -319,7 +309,6 @@ public class Database {
         }
     }
 
-    /** One saved reaction or button role, for /reaction-roles list. {@code kind} is "reaction" or "button". */
     public record ReactionRoleEntry(String kind, String channelId, String messageId, String key, String roleId) {
     }
 
@@ -347,7 +336,6 @@ public class Database {
         return entries;
     }
 
-    /** Removes the reaction mapping of one emoji; false when there was none. */
     public static boolean deleteReactionRole(String guildId, String messageId, String emoji) throws SQLException {
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement(
@@ -359,7 +347,6 @@ public class Database {
         }
     }
 
-    /** Removes every reaction and button mapping of a message; returns how many were removed. */
     public static int deleteReactionRolesForMessage(String guildId, String messageId) throws SQLException {
         int removed = 0;
         try (Connection connection = getConnection()) {
@@ -375,7 +362,6 @@ public class Database {
         return removed;
     }
 
-    /** Returns the role configured for this reaction, or {@code null} when it is not configured. */
     public static String getReactionRole(String guildId, String messageId, String emoji) throws SQLException {
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
@@ -391,7 +377,6 @@ public class Database {
         }
     }
 
-    /** Saves the role assigned by a button on a message. */
     public static void saveReactionRoleButton(String guildId, String channelId, String messageId, String buttonId,
             String roleId) throws SQLException {
         try (Connection connection = getConnection();
@@ -410,7 +395,6 @@ public class Database {
         }
     }
 
-    /** Returns the role configured for this button, or {@code null} when it is not configured. */
     public static String getReactionRoleButton(String guildId, String messageId, String buttonId)
             throws SQLException {
         try (Connection connection = getConnection();
@@ -427,7 +411,6 @@ public class Database {
         }
     }
 
-    /** Removes a button mapping if publishing its button to Discord fails. */
     public static void deleteReactionRoleButton(String guildId, String messageId, String buttonId)
             throws SQLException {
         try (Connection connection = getConnection();
@@ -648,8 +631,7 @@ public class Database {
         try (Connection connection = getConnection()) {
             connection.setAutoCommit(false);
             try {
-                // Use an explicit lookup/update-or-insert so older databases without the
-                // (guild_id, name) unique constraint can still save panels safely.
+
                 boolean panelExists = false;
                 try (PreparedStatement lookup = connection.prepareStatement(
                         "SELECT id FROM ticket_panels WHERE guild_id = ? AND name = ? ORDER BY id LIMIT 1")) {
@@ -762,7 +744,6 @@ public class Database {
         }
     }
 
-    /** Stores the dropdown description/emoji of the panel's categories; options of removed categories go. */
     private static void saveCategoryOptions(Connection connection, TicketPanelData panel) throws SQLException {
         try (PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM ticket_panel_category_options WHERE panel_id = ?")) {
@@ -803,7 +784,6 @@ public class Database {
         }
     }
 
-    /** How many open tickets this member currently has from the given panel (closed ones don't count). */
     public static int countOpenTickets(String creatorId, int panelId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM tickets WHERE creator_id = ? AND panel_id = ? AND state = 'OPEN'";
         try (Connection connection = getConnection();
@@ -816,7 +796,6 @@ public class Database {
         }
     }
 
-    /** Log channel and switched-off categories of a server; null when the server never set any. */
     public static String[] getLogSettings(String guildId) throws SQLException {
         try (Connection connection = getConnection();
                 PreparedStatement statement = connection.prepareStatement(
@@ -851,7 +830,7 @@ public class Database {
             String tableName,
             String valueColumn,
             List<String> values) throws SQLException {
-        // Table and column names are internal constants selected by callers.
+
         try (PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM " + tableName + " WHERE panel_id = ?")) {
             delete.setInt(1, panelId);
@@ -925,7 +904,6 @@ public class Database {
         panelData.staffRoles = loadPanelValues(connection, panelData.id, "ticket_panel_staff_roles", "role_id");
         panelData.pingRoles = loadPanelValues(connection, panelData.id, "ticket_panel_ping_roles", "role_id");
 
-        // Derive counts from the loaded lists so duplicate state cannot drift.
         panelData.totalCategories = panelData.categories.size();
         panelData.totalStaffRoles = panelData.staffRoles.size();
         panelData.totalPingRoles = panelData.pingRoles.size();
@@ -956,7 +934,6 @@ public class Database {
         }
     }
 
-    /** Remembers where a panel was published so later edits can update that message. */
     public static void savePanelMessage(int panelId, String channelId, String messageId) throws SQLException {
         String sql = "UPDATE ticket_panels SET channel_id = ?, message_id = ? WHERE id = ?";
         try (Connection connection = getConnection();
@@ -982,7 +959,6 @@ public class Database {
         }
     }
 
-    /** Deletes a panel and (through ON DELETE CASCADE) its categories, roles and questions. */
     public static boolean deletePanel(String guildId, int panelId) throws SQLException {
         String sql = "DELETE FROM ticket_panels WHERE guild_id = ? AND id = ?";
         try (Connection connection = getConnection();
@@ -1021,7 +997,7 @@ public class Database {
                     boolean paragraph = resultSet.getInt("paragraph") != 0;
                     boolean required = resultSet.getInt("required") != 0;
                     String placeholder = resultSet.getString("placeholder");
-                    // wasNull() refers to the most recent column read, so check it right after this one.
+
                     int maxLengthValue = resultSet.getInt("max_length");
                     Integer maxLength = resultSet.wasNull() ? null : maxLengthValue;
                     questions.add(new TicketQuestion(prompt, paragraph, required, placeholder, maxLength));
@@ -1031,7 +1007,6 @@ public class Database {
         return questions;
     }
 
-    /** Replaces all questions of one category, keeping the given order. */
     public static void savePanelQuestions(int panelId, String categoryName, List<TicketQuestion> questions)
             throws SQLException {
         try (Connection connection = getConnection()) {

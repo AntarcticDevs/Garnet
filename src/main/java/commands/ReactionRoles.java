@@ -97,7 +97,6 @@ public class ReactionRoles extends ListenerAdapter implements Command {
         }
     }
 
-    /** The channel option, or the channel the command was used in; null (after replying) if it can't hold messages. */
     private static GuildMessageChannel targetChannel(SlashCommandInteractionEvent event) {
         OptionMapping option = event.getOption("channel");
         if (option != null) {
@@ -126,7 +125,7 @@ public class ReactionRoles extends ListenerAdapter implements Command {
             return;
         }
         if (!event.getMember().canInteract(role)) {
-            // Otherwise anyone with Manage Server could hand out roles above their own.
+
             event.reply("You can only set up roles that are below your own highest role.")
                     .setEphemeral(true).queue();
             return;
@@ -236,7 +235,6 @@ public class ReactionRoles extends ListenerAdapter implements Command {
                         + "to tidy it up, so it may still show reactions or buttons.").queue());
     }
 
-    /** Takes the bot's own reactions and the role buttons off a message after their roles were removed. */
     private static void tidyMessage(Message message, List<String> emojiCodes, List<String> buttonIds,
             SlashCommandInteractionEvent event) {
         for (var reaction : message.getReactions()) {
@@ -465,7 +463,7 @@ public class ReactionRoles extends ListenerAdapter implements Command {
 
     @Override
     public void onMessageReactionAdd(MessageReactionAddEvent event) {
-        // The bot also gets reaction events from DMs, where there is no guild (getGuild() would throw).
+
         if (!event.isFromGuild() || (event.getUser() != null && event.getUser().isBot())) {
             return;
         }
@@ -482,7 +480,6 @@ public class ReactionRoles extends ListenerAdapter implements Command {
                 event.getUserId(), false);
     }
 
-    /** A deleted message can't be reacted to or clicked any more, so forget its roles. */
     @Override
     public void onMessageDelete(MessageDeleteEvent event) {
         if (event.isFromGuild()) {

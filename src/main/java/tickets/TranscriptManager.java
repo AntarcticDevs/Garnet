@@ -47,11 +47,6 @@ public class TranscriptManager {
         return destination;
     }
 
-    /**
-     * Posts the transcript to the panel's transcript channel, if one is set. Does nothing (and
-     * completes normally) when the panel has no transcript channel. Fails when the channel is gone
-     * or the upload fails.
-     */
     public CompletableFuture<Void> sendToPanelChannel(TextChannel channel, TicketData ticket) {
         TextChannel destination;
         try {
@@ -65,7 +60,6 @@ public class TranscriptManager {
         return sendTranscript(channel, destination);
     }
 
-    /** Close: send the transcript in the background; a failure is logged and never blocks closing. */
     public void sendOnClose(TextChannel channel, TicketData ticket) {
         sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {
             if (error != null) {
@@ -74,10 +68,6 @@ public class TranscriptManager {
         });
     }
 
-    /**
-     * Delete: the transcript is sent first, and the channel is only deleted once it went through,
-     * because deleting loses the conversation. If it fails, the ticket is kept and the user is told.
-     */
     public void sendThenDelete(TextChannel channel, TicketData ticket, InteractionHook hook,
                                Runnable afterDeleted) {
         sendToPanelChannel(channel, ticket).whenComplete((ignored, error) -> {

@@ -22,14 +22,11 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
 
-/** Dyno-style server events, posted to the log channel when their category is on. */
 public class ServerLogListener extends ListenerAdapter {
 
     private static String who(User user) {
         return user.getAsMention() + " (" + user.getName() + ", `" + user.getId() + "`)";
     }
-
-    // ---- members ------------------------------------------------------------------------
 
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
@@ -95,8 +92,6 @@ public class ServerLogListener extends ListenerAdapter {
                 .setDescription(who(user) + "\n" + roles));
     }
 
-    // ---- moderation ---------------------------------------------------------------------
-
     @Override
     public void onGuildBan(GuildBanEvent event) {
         Guild guild = event.getGuild();
@@ -105,7 +100,7 @@ public class ServerLogListener extends ListenerAdapter {
         }
         User target = event.getUser();
         OffsetDateTime started = OffsetDateTime.now();
-        // The moderator and reason are only in the audit log (needs View Audit Log); without it we still log the ban.
+
         guild.retrieveAuditLogs().type(ActionType.BAN).limit(10).queue(entries -> {
             var match = entries.stream()
                     .filter(entry -> entry.getTargetId().equals(target.getId()))
@@ -128,8 +123,6 @@ public class ServerLogListener extends ListenerAdapter {
         LogService.send(event.getGuild(), LogCategory.MODERATION,
                 LogService.embed("Member unbanned", LogService.GREEN).setDescription(who(event.getUser())));
     }
-
-    // ---- server -------------------------------------------------------------------------
 
     @Override
     public void onChannelCreate(ChannelCreateEvent event) {
@@ -162,8 +155,6 @@ public class ServerLogListener extends ListenerAdapter {
         LogService.send(event.getGuild(), LogCategory.SERVER, LogService.embed("Role deleted", LogService.RED)
                 .setDescription("`" + event.getRole().getName() + "`"));
     }
-
-    // ---- voice --------------------------------------------------------------------------
 
     @Override
     public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {

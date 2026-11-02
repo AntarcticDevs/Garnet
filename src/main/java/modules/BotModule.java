@@ -25,16 +25,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
-/**
- * A feature that can be switched on or off in config.yml under {@code modules:}.
- *
- * <p>Each module lists the listeners it needs. A listener that is also a {@link commands.Command}
- * contributes its slash command, so turning a module off removes both the behaviour and the command.
- * Help and the console activity logger are not modules: they are always on.
- *
- * <p>To add a feature, add a constant here and a line to the {@code modules:} section of the default
- * config in {@link ConfigManager}.
- */
 public enum BotModule {
     INFORMATION("information", "/ping, /info, /userinfo, /avatar",
             () -> List.<ListenerAdapter>of(new Ping(), new Info(), new UserInfo(), new Avatar())),
@@ -71,17 +61,14 @@ public enum BotModule {
         return description;
     }
 
-    /** On unless config.yml says otherwise, so older config files keep every feature. */
     public boolean isEnabled() {
         return ConfigManager.getBoolean(SECTION + "." + key, true);
     }
 
-    /** Creates the listeners (and so the slash commands) of this module. */
     public List<ListenerAdapter> create() {
         return factory.get();
     }
 
-    /** Problems in the {@code modules:} section that would otherwise be silently ignored, such as typos. */
     public static List<String> configWarnings() {
         List<String> warnings = new ArrayList<>();
 

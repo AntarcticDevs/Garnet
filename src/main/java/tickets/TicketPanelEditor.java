@@ -44,13 +44,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/**
- * The ticket panel editor: one ephemeral Components V2 message that updates in place.
- *
- * <p>Every component ID has the form {@code pe:<panelId>:<page>:<action>[:<arg>]} so a click can
- * be handled without keeping any state in memory. All changes are saved immediately; the
- * published panel message only changes when the user presses Publish.
- */
 public class TicketPanelEditor extends ListenerAdapter {
 
     private static final String PREFIX = "pe:";
@@ -62,7 +55,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         ROUTING("routing", "Roles & routing", "Staff and ping roles, channels"),
         CATEGORIES("categories", "Categories", "Dropdown categories and their questions"),
         SETTINGS("settings", "Behaviour", "On/off, ticket limit, welcome message"),
-        /** Sub-page of Categories that edits the questions of one category; not in the page menu. */
+
         QUESTIONS("questions", "Questions", "The form questions of one category");
 
         final String key;
@@ -88,10 +81,6 @@ public class TicketPanelEditor extends ListenerAdapter {
     private record Ctx(TicketPanelData panel, Page page, String action, String arg) {
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Entry points (called from /ticket panel ...)
-    // ---------------------------------------------------------------------------------------
-
     public void open(SlashCommandInteractionEvent event, TicketPanelData panelData) {
         open(event, panelData, Page.APPEARANCE);
     }
@@ -102,10 +91,6 @@ public class TicketPanelEditor extends ListenerAdapter {
                 .setEphemeral(true)
                 .queue();
     }
-
-    // ---------------------------------------------------------------------------------------
-    // Rendering
-    // ---------------------------------------------------------------------------------------
 
     private static String id(TicketPanelData panel, Page page, String action) {
         return PREFIX + panel.id + ":" + page.key + ":" + action;
@@ -137,9 +122,8 @@ public class TicketPanelEditor extends ListenerAdapter {
         return render(panel, page, guild, notice, -1);
     }
 
-    /** {@code categoryIndex} is only used by the QUESTIONS page. */
     private Container render(TicketPanelData panel, Page requested, Guild guild, String notice, int categoryIndex) {
-        // The questions page needs a valid category; otherwise fall back to the category list.
+
         Page page = requested == Page.QUESTIONS && (categoryIndex < 0 || categoryIndex >= panel.categories.size())
                 ? Page.CATEGORIES
                 : requested;
@@ -161,7 +145,7 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
 
         if (page == Page.QUESTIONS) {
-            // The question manager has its own Back button instead of the page menu and action row.
+
             return Container.of(children).withAccentColor(TicketPanel.parseColour(panel.embedColour));
         }
 
@@ -369,7 +353,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
     }
 
-    /** The question manager for one category: every question has its own Edit button. */
     private void addQuestions(List<ContainerChildComponent> children, TicketPanelData panel, int categoryIndex) {
         String category = panel.categories.get(categoryIndex);
         List<TicketQuestion> questions = loadQuestions(panel, category);
@@ -422,10 +405,6 @@ public class TicketPanelEditor extends ListenerAdapter {
                 Button.secondary(id(panel, Page.QUESTIONS, "back"), "Back to categories")));
     }
 
-    /**
-     * The add/edit form for one question. {@code question} is null when adding. Short/Paragraph is a
-     * radio group and Required a checkbox, so nothing has to be typed for those settings.
-     */
     private Modal questionModal(TicketPanelData panel, int categoryIndex, String questionKey, TicketQuestion question) {
         boolean paragraph = question != null && question.paragraph();
         return Modal.create(id(panel, Page.QUESTIONS, "qmodal", categoryIndex + ":" + questionKey),
@@ -466,11 +445,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         return truncate(String.join(" ", valid.stream().map(value -> "<" + prefix + value + ">").toList()), 600);
     }
 
-    // ---------------------------------------------------------------------------------------
-    // Interaction plumbing
-    // ---------------------------------------------------------------------------------------
-
-    /** Validates the click and loads the panel; replies with an error and returns null on failure. */
     private Ctx resolve(IReplyCallback event, String customId) {
         Guild guild = event.getGuild();
         Member member = event.getMember();
@@ -516,7 +490,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         event.editMessage(questionsView(panel, categoryIndex, event.getGuild(), notice)).queue();
     }
 
-    /** Parses "categoryIndex" or "categoryIndex:questionIndex" from a component ID argument; null if invalid. */
     private static int[] parseIndexes(String arg, int expected) {
         if (arg == null) {
             return null;
@@ -546,10 +519,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
         refresh(event, ctx.panel(), ctx.page(), notice);
     }
-
-    // ---------------------------------------------------------------------------------------
-    // Buttons
-    // ---------------------------------------------------------------------------------------
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
@@ -632,7 +601,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
     }
 
-    /** Enables or disables the panel and updates the posted message in place straight away. */
     private void togglePanel(ButtonInteractionEvent event, Ctx ctx) {
         TicketPanelData panel = ctx.panel();
         panel.disabled = !panel.disabled;
@@ -762,10 +730,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
         event.editMessage(plainView("**Deleted** the panel `" + truncate(panel.name, 60) + "`.")).queue();
     }
-
-    // ---------------------------------------------------------------------------------------
-    // Select menus
-    // ---------------------------------------------------------------------------------------
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
@@ -929,7 +893,7 @@ public class TicketPanelEditor extends ListenerAdapter {
                         .orElse(null);
                 boolean moved = panel.messageId != null && !java.util.Objects.equals(newChannelId, panel.channelId);
                 if (moved) {
-                    // Moving the panel removes the old message; Publish posts it in the new channel.
+
                     TextChannel old = panel.channelId == null ? null : event.getGuild().getTextChannelById(panel.channelId);
                     if (old != null) {
                         old.deleteMessageById(panel.messageId).queue(null, error -> { });
@@ -953,10 +917,6 @@ public class TicketPanelEditor extends ListenerAdapter {
             default -> deny(event, "That editor control isn't available.");
         }
     }
-
-    // ---------------------------------------------------------------------------------------
-    // Modals
-    // ---------------------------------------------------------------------------------------
 
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
@@ -1044,7 +1004,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         saveAndRefresh(event, ctx, "✅ Saved.");
     }
 
-    /** Saves the add/edit question form; the argument is "categoryIndex:questionIndex" or "categoryIndex:new". */
     private void saveQuestion(ModalInteractionEvent event, Ctx ctx) {
         TicketPanelData panel = ctx.panel();
         int[] indexes = parseIndexes(ctx.arg(), 2);
@@ -1090,7 +1049,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         }
     }
 
-    /** Reads and validates the question form. */
     private static TicketQuestion readQuestion(ModalInteractionEvent event) {
         String prompt = value(event, "prompt");
         if (prompt.isEmpty()) {
@@ -1126,10 +1084,6 @@ public class TicketPanelEditor extends ListenerAdapter {
         return new TicketQuestion(prompt, paragraph, required != null && required.getAsBoolean(),
                 placeholder, maxLength);
     }
-
-    // ---------------------------------------------------------------------------------------
-    // Parsing and small helpers
-    // ---------------------------------------------------------------------------------------
 
     private static TextInput input(
             String id, TextInputStyle style, int maxLength, String value, String placeholder, boolean required) {

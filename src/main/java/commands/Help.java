@@ -26,14 +26,12 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class Help extends ListenerAdapter implements Command {
 
     private static final String MENU_ID = "help:page";
     private static final String OVERVIEW = "overview";
     private static final Color ACCENT = new Color(0x5865F2);
 
-    /** One browsable page; {@code module} is null for pages that are always shown. */
     private record Page(BotModule module, String key, String emoji, String title, String summary, String body) {
     }
 

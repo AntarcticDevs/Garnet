@@ -12,7 +12,6 @@ import utils.Log;
 import java.awt.Color;
 import java.sql.SQLException;
 
-/** Ticket events for the server's log channel (see /logs). Never throws; does nothing when logging is off. */
 public final class TicketLog {
 
     public enum Kind {
@@ -40,7 +39,6 @@ public final class TicketLog {
         log(guild, Kind.OPENED, ticket, null, "Opened by " + member.getAsMention() + ".");
     }
 
-    /** Logs an event using the description of the embed that was just posted in the ticket ("Closed by @x."). */
     public static void fromEmbed(Guild guild, Kind kind, TicketData ticket, TextChannel channel, EmbedBuilder embed) {
         log(guild, kind, ticket, channel == null ? null : channel.getName(), embed.getDescriptionBuilder().toString());
     }

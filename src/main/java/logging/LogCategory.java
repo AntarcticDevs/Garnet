@@ -2,7 +2,6 @@ package logging;
 
 import java.util.Locale;
 
-/** Groups of events a server can switch on or off for its log channel. */
 public enum LogCategory {
     TICKETS("tickets", "Ticket opened, closed, reopened, claimed, transferred, deleted", true),
     MEMBERS("members", "Joins, leaves, nickname and role changes", true),

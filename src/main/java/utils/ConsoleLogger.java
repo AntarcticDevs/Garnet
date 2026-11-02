@@ -1,6 +1,5 @@
 package utils;
 
-/** Kept for existing callers; messages now go through {@link Log} so they also reach logs/latest.log. */
 public final class ConsoleLogger {
     private ConsoleLogger() {
     }

@@ -25,6 +25,7 @@ import java.io.IOException;
 public class Main {
 
         public static void main(String[] args) throws InterruptedException {
+            ConsoleLogger.logConsole("---------------------------------------------------------------------------------------");
         try {
             boolean created = ConfigManager.createIfMissing();
             ConfigManager.load();
@@ -53,8 +54,6 @@ public class Main {
             Log.error("Main.main failed", e);
         }
 
-        // Help and the activity logger are always on; every other feature is a module that can be
-        // switched off in config.yml. Each listener that is also a Command adds its slash command.
         List<ListenerAdapter> listeners = new ArrayList<>();
         List<CommandData> commandData = new ArrayList<>();
         Help help = new Help();

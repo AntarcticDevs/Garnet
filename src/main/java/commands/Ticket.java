@@ -594,8 +594,7 @@ public class Ticket extends ListenerAdapter implements Command {
                     .setEphemeral(true)
                     .queue();
             case "transcript" -> {
-                // A requested transcript is private: posted ephemerally here. Close and delete
-                // are what send it to the panel's transcript channel.
+
                 event.deferReply(true).queue(hook -> {
                     try {
                         new TranscriptManager().sendTranscript(channel, hook)

@@ -17,10 +17,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * Sends event embeds to each server's log channel (set with /logs channel). Settings are cached,
- * because voice and member events can be frequent.
- */
 public final class LogService {
     public static final Color GREEN = new Color(0x57F287);
     public static final Color RED = new Color(0xED4245);
@@ -102,19 +98,16 @@ public final class LogService {
         return disabled;
     }
 
-    /** A log embed with the colour and timestamp every entry shares. */
     public static EmbedBuilder embed(String title, Color colour) {
         return new EmbedBuilder().setTitle(title).setColor(colour).setTimestamp(Instant.now());
     }
 
-    /** True when logging could currently reach a channel for this category. */
     public static boolean wants(Guild guild, LogCategory category) {
         return BotModule.LOGGING.isEnabled() && guild != null
                 && settings(guild.getId()).channelId() != null
                 && settings(guild.getId()).enabled(category);
     }
 
-    /** Posts the entry; never throws, and quietly does nothing when logging isn't set up. */
     public static void send(Guild guild, LogCategory category, EmbedBuilder embed) {
         try {
             if (!wants(guild, category)) {

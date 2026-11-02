@@ -18,22 +18,16 @@ import java.util.Locale;
 
 import utils.EmbedHelpers;
 
-
 public class TicketPanel {
     public static final int DEFAULT_COLOUR = 0x5865F2;
     public static final String DEFAULT_DISABLED_MESSAGE =
             "This ticket panel is currently disabled. Please check back later.";
 
-    /** Sends the panel as a new message. */
     public RestAction<Message> panel(TicketPanelData panelData, TextChannel channel) {
         return channel.sendMessageEmbeds(buildEmbed(panelData, channel.getGuild()))
                 .addComponents(buildActionRow(panelData));
     }
 
-    /**
-     * Publishes the panel: edits the previously published message when it still exists,
-     * otherwise sends a fresh one. The caller stores the resulting message's channel and ID.
-     */
     public RestAction<Message> publish(TicketPanelData panelData, TextChannel channel) {
         MessageEmbed embed = buildEmbed(panelData, channel.getGuild());
         ActionRow row = buildActionRow(panelData);
@@ -46,10 +40,6 @@ public class TicketPanel {
                 .onErrorFlatMap(error -> channel.sendMessageEmbeds(embed).addComponents(row));
     }
 
-    /**
-     * Edits the already-published panel message in place (for example after enabling or disabling it).
-     * Returns null when the panel isn't published or its channel is gone.
-     */
     public RestAction<Message> editPublished(Guild guild, TicketPanelData panelData) {
         if (panelData.channelId == null || panelData.messageId == null) {
             return null;
@@ -62,7 +52,6 @@ public class TicketPanel {
                 .setComponents(buildActionRow(panelData));
     }
 
-    /** The panel embed exactly as members will see it. */
     public MessageEmbed buildEmbed(TicketPanelData panelData, Guild guild) {
         EmbedBuilder embed = new EmbedBuilder()
                 .setTitle(blankToNull(panelData.embedTitle) == null ? panelData.name : panelData.embedTitle)
@@ -89,7 +78,6 @@ public class TicketPanel {
         return embed.build();
     }
 
-    /** The category dropdown when the panel has categories, otherwise the create button. */
     public ActionRow buildActionRow(TicketPanelData panelData) {
         if (panelData.disabled) {
             return ActionRow.of(Button.secondary("ticket:disabled:" + panelData.id, "Tickets disabled")
@@ -132,8 +120,6 @@ public class TicketPanel {
         return categories.build();
     }
 
-    // ---- parsing helpers shared with the editor -------------------------------------------
-
     public static ButtonStyle parseStyle(String style) {
         if (style == null) {
             return ButtonStyle.PRIMARY;
@@ -146,7 +132,6 @@ public class TicketPanel {
         };
     }
 
-    /** Returns the parsed emoji, or null when blank or invalid. */
     public static Emoji parseEmoji(String value) {
         if (blankToNull(value) == null) {
             return null;

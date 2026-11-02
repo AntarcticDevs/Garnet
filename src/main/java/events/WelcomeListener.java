@@ -19,7 +19,6 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 
-
 import database.Database;
 import utils.OrdinalUtils;
 import utils.EmbedHelpers;
@@ -32,8 +31,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.List;
-
-
 
 public class WelcomeListener extends ListenerAdapter implements Command {
     private static final String DEFAULT_EMBED_VALUE = "__garnet_default__";
@@ -245,7 +242,7 @@ public class WelcomeListener extends ListenerAdapter implements Command {
     private boolean sendWelcomeMessage(Guild guild, Member member) {
         TextChannel welcomeChannel = getWelcomeChannel(guild);
         if (welcomeChannel == null) {
-            
+
             return false;
         }
 
@@ -356,7 +353,6 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         }
     }
 
-    /** Whether new members get a welcome message. On unless a server turned it off. */
     private boolean isWelcomeEnabled(Guild guild) {
         String sql = "SELECT enabled FROM welcomer WHERE guild_id = ?";
         try (Connection connection = Database.getConnection();
@@ -371,7 +367,6 @@ public class WelcomeListener extends ListenerAdapter implements Command {
         }
     }
 
-    /** Whether the welcome message mentions the new member. On unless a server turned it off. */
     private boolean getWelcomePing(Guild guild) {
         String sql = "SELECT ping FROM welcomer WHERE guild_id = ?";
         try (Connection connection = Database.getConnection();

@@ -201,7 +201,6 @@ public class TicketButton extends ListenerAdapter {
         }
     }
 
-    /** Why this member can't open another ticket from the panel (its per-member limit), or null if they can. */
     private static String limitMessage(Member member, TicketPanelData panelData) throws SQLException {
         if (panelData == null || panelData.ticketLimit <= 0) {
             return null;
@@ -214,7 +213,6 @@ public class TicketButton extends ListenerAdapter {
                 + panelData.ticketLimit + "). Please close one before opening another.";
     }
 
-    /** The first message of a ticket: the panel's welcome message, or the default. Placeholders are filled in. */
     private static String welcomeText(TicketPanelData panelData, Member member, String categoryName) {
         String template = panelData == null || panelData.welcomeMessage == null || panelData.welcomeMessage.isBlank()
                 ? "Opened by {user}. Please describe your request here."
@@ -231,7 +229,6 @@ public class TicketButton extends ListenerAdapter {
             "⚠️ **Delete this ticket?** The channel and its record are removed for good. "
                     + "If the panel has a transcript channel, the transcript is sent there first.";
 
-    /** The Yes/Cancel buttons shown under {@link #DELETE_PROMPT}; also used by /ticket delete. */
     public static ActionRow deleteConfirmRow() {
         return ActionRow.of(
                 Button.danger("ticket:staff:deleteconfirm", "Yes, delete"),
@@ -330,7 +327,7 @@ public class TicketButton extends ListenerAdapter {
         for (int i = 0; i < Math.min(answers.size(), 5); i++) {
             String answer = answers.get(i);
             if (answer.isBlank()) {
-                // An optional question the member skipped.
+
                 answer = "*Not answered*";
             }
             embed.addField(questions.get(i), answer.length() > 1024 ? answer.substring(0, 1021) + "..." : answer,
@@ -474,8 +471,7 @@ public class TicketButton extends ListenerAdapter {
             if ("deleteconfirm".equals(action)) {
                 event.deferEdit().queue(hook -> new TranscriptManager().sendThenDelete(
                         channel, ticket, hook, () -> {
-                            // The reply lives in the deleted channel, so it can't be edited anymore
-                            // (Discord answers 10008 Unknown Message).
+
                             try {
                                 Database.deleteTicketByChannelId(channel.getId());
                                 Log.info("Ticket channel " + channel.getId() + " deleted.");
@@ -487,8 +483,7 @@ public class TicketButton extends ListenerAdapter {
             }
 
             if ("transcript".equals(action)) {
-                // A requested transcript is private: posted ephemerally here. Close and delete
-                // are what send it to the panel's transcript channel.
+
                 event.deferReply(true).queue(hook -> {
                     try {
                         new TranscriptManager().sendTranscript(channel, hook)

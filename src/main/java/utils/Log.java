@@ -10,12 +10,6 @@ import java.nio.file.StandardOpenOption;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 
-/**
- * Small logger: every line goes to the console and to {@code logs/latest.log}, so a host can send
- * that one file when something breaks. Errors include the full stack trace.
- *
- * <p>No dependencies on purpose. If the log file can't be written, the console still works.
- */
 public final class Log {
     private static final Path LOG_DIR = Path.of("logs");
     private static final Path LOG_FILE = LOG_DIR.resolve("latest.log");
@@ -67,7 +61,7 @@ public final class Log {
             if (!started) {
                 started = true;
                 Files.createDirectories(LOG_DIR);
-                // Keep the previous run's log next to the new one instead of growing forever.
+
                 if (Files.exists(LOG_FILE)) {
                     Files.move(LOG_FILE, OLD_LOG_FILE, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }

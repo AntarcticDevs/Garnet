@@ -25,9 +25,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-
-
-
 public class Embeds extends ListenerAdapter implements Command {
 
     @Override
@@ -254,9 +251,7 @@ public class Embeds extends ListenerAdapter implements Command {
         }
     }
 
-
-
-    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) { // USE null FOR THE SECOND PARAMETER TO JUST REPLY TO USER MY FUTURE SELFF
+    private void sendEmbed(SlashCommandInteractionEvent event, MessageChannel channel) {  // USE null FOR THE SECOND PARAMETER TO JUST REPLY TO USER MY FUTURE SELFF
         if (event.getGuild() == null) {
             event.reply("This command can only be used in a server.")
                     .setEphemeral(true)
@@ -309,8 +304,6 @@ public class Embeds extends ListenerAdapter implements Command {
                     .queue();
         }
     }
-
-
 
     private void addField(SlashCommandInteractionEvent event, String guildId, String embedName) {
         String findEmbedSql = "SELECT id FROM embeds WHERE guild_id = ? AND name = ?";
