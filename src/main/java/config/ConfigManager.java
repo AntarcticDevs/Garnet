@@ -38,6 +38,7 @@ public class ConfigManager {
             # slash commands from Discord and hides it from /help.
             modules:
               information: true   # /ping, /info, /userinfo, /avatar
+              activity: true      # admin-only /activity
               moderation: true    # /ban, /kick, /purge
               reaction-roles: true # /reaction-roles
               tickets: true       # ticket panels, ticket channels and transcripts

@@ -5,6 +5,8 @@ import com.google.gson.GsonBuilder;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
+import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -13,7 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 
-public class ActivityManager {
+public class ActivityManager extends ListenerAdapter {
 
     // ---------- data model (this is what gets saved to JSON) ----------
 
@@ -80,6 +82,8 @@ public class ActivityManager {
     private JDA jda;
     private ScheduledFuture<?> rotationTask;
     private int rotationIndex = 0;
+    private boolean initialized;
+    private boolean shutdown;
 
     private ActivityManager() {}
 
@@ -87,6 +91,12 @@ public class ActivityManager {
 
     /** Call once after JDA is ready (e.g. in a ReadyEvent listener). */
     public synchronized void init(JDA jda) {
+        if (shutdown) {
+            throw new IllegalStateException("ActivityManager cannot be restarted after shutdown");
+        }
+        if (initialized) {
+            return;
+        }
         this.jda = jda;
         load();
         if (data.rotation.enabled) {
@@ -95,9 +105,27 @@ public class ActivityManager {
             applyInternal(data.current, null);   // restore after restart
         }
         scheduler.scheduleAtFixedRate(this::checkSchedule, 10, 30, TimeUnit.SECONDS);
+        initialized = true;
     }
 
-    public void shutdown() { scheduler.shutdownNow(); }
+    public synchronized void shutdown() {
+        if (shutdown) {
+            return;
+        }
+        shutdown = true;
+        if (rotationTask != null) {
+            rotationTask.cancel(false);
+            rotationTask = null;
+        }
+        scheduler.shutdownNow();
+    }
+
+    @Override
+    public synchronized void onGuildMemberJoin(GuildMemberJoinEvent event) {
+        if (initialized) {
+            onEvent("MEMBER_MILESTONE", event.getGuild().getMemberCount(), event.getGuild());
+        }
+    }
 
     // ---------- manual control (used by /activity) ----------
 

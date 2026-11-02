@@ -17,6 +17,7 @@ moderation, reaction roles, embeds and a welcomer. Every feature can be switched
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
+| **Activity** | Admin-only `/activity`; activity settings, presets, rotation, schedules and member milestones are stored in `data/activity.json` |
 | **Help** | `/help` lists only the features you turned on |
 
 ## Requirements
@@ -82,6 +83,7 @@ database-path: ''         # blank = data/garnet.db
 
 modules:                  # true = on, false = off
   information: true
+  activity: true
   moderation: true
   reaction-roles: true
   tickets: true
@@ -106,6 +108,7 @@ help-thumbnail-url: ''    # blank = the bot's avatar
 | --- | --- |
 | `config.yml` | Your settings |
 | `data/garnet.db` | Everything the bot saves (panels, tickets, embeds, reaction roles, log settings). **Back this up.** |
+| `data/activity.json` | Bot activity and presence settings. Stop the bot before editing; back it up to preserve presets, schedules and member-milestone rules. |
 | `logs/latest.log` | This run's log. `previous.log` is the run before. Send `latest.log` when asking for help. |
 
 ## Updating

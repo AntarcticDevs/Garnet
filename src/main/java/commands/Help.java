@@ -43,6 +43,13 @@ public class Help extends ListenerAdapter implements Command {
                     `/info` Shows information about this server.
                     `/userinfo [user]` Shows information about a member.
                     `/avatar [user]` Shows a member's avatar."""),
+            new Page(BotModule.ACTIVITY, "activity", "🎮", "Activity",
+                    "Set or reset the bot's presence",
+                    """
+                    `/activity set type text [url]` Sets the bot's activity. Streaming requires a Twitch or YouTube URL.
+                    `/activity reset` Clears the bot's activity.
+                    *Admins only. Presets, rotation, schedules and member-milestone rules can be configured in
+                    `data/activity.json`.*"""),
             new Page(BotModule.MODERATION, "moderation", "🛡️", "Moderation",
                     "Ban, kick and clean up messages",
                     """

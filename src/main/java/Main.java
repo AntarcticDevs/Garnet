@@ -1,6 +1,7 @@
 import utils.Log;
 import config.ConfigManager;
 import commands.Help;
+import commands.ActivityManager;
 import events.ConsoleActivityLogger;
 import modules.BotModule;
 
@@ -49,9 +50,13 @@ public class Main {
         }
 
         try {
-                Database.initialize();
+            Database.initialize();
         } catch (SQLException e) {
-            Log.error("Main.main failed", e);
+            Log.error("Database initialization failed; stopping startup", e);
+            ConsoleLogger.logConsole("Couldn't initialize the database. Fix the database path or permissions, "
+                    + "then start the bot again.");
+            System.exit(1);
+            return;
         }
 
         List<ListenerAdapter> listeners = new ArrayList<>();
@@ -102,6 +107,13 @@ public class Main {
             }
             System.exit(1);
             return;
+        }
+
+        if (BotModule.ACTIVITY.isEnabled()) {
+            ActivityManager activityManager = ActivityManager.get();
+            activityManager.init(jda);
+            Runtime.getRuntime().addShutdownHook(
+                    new Thread(activityManager::shutdown, "activity-manager-shutdown"));
         }
 
         System.out.println("""
