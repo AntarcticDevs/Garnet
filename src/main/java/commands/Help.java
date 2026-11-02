@@ -54,10 +54,12 @@ public class Help extends ListenerAdapter implements Command {
             new Page(BotModule.REACTION_ROLES, "reaction-roles", "🎭", "Reaction roles",
                     "Give members a role with a reaction or button",
                     """
-                    `/reaction-roles style role message-id [emoji] [label]` Configures either an emoji reaction
-                    or a button on a message in the current channel. Emoji style adds the role on reaction and
-                    removes it when the reaction is removed; button style toggles the role when clicked.
-                    Button emoji and label are optional. Settings persist across restarts.
+                    `/reaction-roles add style role message-id [emoji] [label] [channel]` Adds a role to a message.
+                    Emoji style gives the role on reaction and takes it away when the reaction is removed.
+                    Button style toggles the role on each click and answers privately; buttons can only go on
+                    messages the bot sent (for example with `/embed send`).
+                    `/reaction-roles remove message-id [emoji]` Removes one emoji, or everything on the message.
+                    `/reaction-roles list` Shows every reaction and button role.
                     *Needs Manage Server; the bot needs Manage Roles.*"""),
             new Page(BotModule.TICKETS, "tickets", "🎫", "Tickets",
                     "Panels, private ticket channels and transcripts",
