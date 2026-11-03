@@ -110,7 +110,7 @@ help-thumbnail-url: ''    # blank = the bot's avatar
 | --- | --- |
 | `config.yml` | Your settings |
 | `data/garnet.db` | Everything the bot saves (panels, tickets, embeds, reaction roles, log settings). **Back this up.** |
-| `data/activity.json` | Bot activity and presence settings. Stop the bot before editing; back it up to preserve presets, schedules and member-milestone rules. |
+| `data/activity.json` (next to the database if you set `database-path`) | Bot activity and presence settings. Stop the bot before editing; back it up to preserve presets, schedules and member-milestone rules. |
 | `logs/latest.log` | This run's log. `previous.log` is the run before. Send `latest.log` when asking for help. |
 
 ## Updating

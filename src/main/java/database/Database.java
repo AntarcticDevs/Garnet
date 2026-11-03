@@ -52,6 +52,21 @@ public class Database {
         return url;
     }
 
+    /**
+     * Where a data file of the bot lives: next to the database when database-path is set in config.yml,
+     * otherwise in the data folder.
+     */
+    public static Path dataFile(String name) {
+        String configured = ConfigManager.getString("database-path");
+        if (configured != null) {
+            Path parent = Path.of(configured).toAbsolutePath().getParent();
+            if (parent != null) {
+                return parent.resolve(name);
+            }
+        }
+        return Path.of("data", name);
+    }
+
     public static Connection getConnection() throws SQLException {
         Connection connection = DriverManager.getConnection(url());
         try (Statement statement = connection.createStatement()) {
