@@ -13,6 +13,7 @@ moderation, reaction roles, embeds and a welcomer. Every feature can be switched
 | **Tickets** | Panels with a button or category dropdown, per-category forms, claim / transfer / close / reopen, delete confirmation, transcripts, per-member limits, welcome message per panel, and a panel editor inside Discord |
 | **Logging** | `/logs` sets a log channel for tickets, members, moderation, server changes and (optionally) voice |
 | **Moderation** | `/ban`, `/kick`, `/purge` |
+| **Role panels** | `/rolepanel`: a posted message where members pick roles with buttons, a dropdown or reactions; edited inside Discord |
 | **Reaction roles** | Choose emoji-reaction or button-style role assignment with `/reaction-roles`; mappings survive restarts |
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Welcomer** | Welcome message for new members using a saved embed |
@@ -85,6 +86,7 @@ modules:                  # true = on, false = off
   information: true
   activity: true
   moderation: true
+  role-panels: true
   reaction-roles: true
   tickets: true
   welcomer: true
@@ -155,10 +157,31 @@ transcript, so a ticket is not deleted if the transcript could not be posted.
 | `members` | joins, leaves, nickname and role changes |
 | `moderation` | bans, unbans, kicks, purges |
 | `server` | channels and roles created or deleted |
+| `roles` | roles given or removed by role panels |
 | `voice` | voice joins, leaves and moves (off by default; it is noisy) |
 
 The bot needs View Channel, Send Messages and Embed Links in the log channel, and View Audit Log to show who
 banned someone.
+
+## Role panels
+
+`/rolepanel create name` makes a panel and opens an editor inside Discord (it needs Manage Server). Pick the
+roles, set how it looks, choose the channel and press **Publish**. Pressing **Update panel** later edits the
+same message in place, so existing buttons and menus keep working.
+
+- **Styles:** buttons (up to 25 roles), a dropdown menu (up to 25), or emoji reactions (every role needs an emoji).
+- **Modes:** *toggle* (pick again to lose it), *pick one* (colours, regions), *add only* (verification) and
+  *remove only* (opt-outs).
+- **Options:** a limit on how many roles one member can hold, a required role, a blocked role, a custom
+  label, emoji, description and button colour per role, and enabling or disabling the panel with its own message.
+- **Replies:** button and dropdown answers are private to the member. Discord has no private replies to
+  reactions, so reaction panels stay silent.
+- **Logging:** role changes are posted to the log channel under the `roles` category (see `/logs`).
+
+The bot needs Manage Roles, its own role must sit above every role a panel hands out, and it needs View Channel,
+Send Messages and Embed Links in the panel channel (plus Add Reactions for the reactions style). `/rolepanel edit name`
+reopens the editor and `/rolepanel list` shows every panel. `/reaction-roles` still works for putting roles on
+messages that already exist.
 
 ## Reaction roles
 

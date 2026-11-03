@@ -278,6 +278,8 @@ public class Database {
             addColumnIfMissing(connection, "reaction_roles", "channel_id TEXT");
             addColumnIfMissing(connection, "reaction_role_buttons", "channel_id TEXT");
 
+            rolepanels.RolePanelStore.createTables(connection);
+
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
 
             addColumnIfMissing(connection, "welcomer", "ping INTEGER NOT NULL DEFAULT 1");
