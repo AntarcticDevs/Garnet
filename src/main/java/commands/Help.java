@@ -66,6 +66,16 @@ public class Help extends ListenerAdapter implements Command {
                     `/reaction-roles remove message-id [emoji]` Removes one emoji, or everything on the message.
                     `/reaction-roles list` Shows every reaction and button role.
                     *Needs Manage Server; the bot needs Manage Roles.*"""),
+            new Page(BotModule.ROLE_PANELS, "role-panels", "🎛️", "Role panels",
+                    "A posted message where members pick their own roles",
+                    """
+                    `/rolepanel create name` Creates a panel and opens its editor.
+                    `/rolepanel edit name` Opens the editor: roles, look, style, mode, access.
+                    `/rolepanel list` Shows every panel and where it is posted.
+                    **Styles:** buttons, a dropdown menu, or reactions.
+                    **Modes:** toggle, pick one, add only, remove only. Optional role limit, required role and
+                    blocked role. Button and dropdown replies are private; reactions can't reply privately.
+                    *Needs Manage Server; the bot needs Manage Roles and its role above the roles it hands out.*"""),
             new Page(BotModule.TICKETS, "tickets", "🎫", "Tickets",
                     "Panels, private ticket channels and transcripts",
                     """

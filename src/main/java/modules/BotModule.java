@@ -18,6 +18,9 @@ import events.WelcomeListener;
 import logging.LogCommand;
 import logging.ServerLogListener;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import rolepanels.RolePanelCommand;
+import rolepanels.RolePanelEditor;
+import rolepanels.RolePanelListener;
 import tickets.TicketButton;
 import tickets.TicketPanelEditor;
 
@@ -36,6 +39,11 @@ public enum BotModule {
             () -> List.<ListenerAdapter>of(new Ban(), new Kick(), new Purge())),
     REACTION_ROLES("reaction-roles", "/reaction-roles and persistent reaction role assignments",
             () -> List.<ListenerAdapter>of(new ReactionRoles())),
+    ROLE_PANELS("role-panels", "/rolepanel: posted role menus with buttons, a dropdown or reactions",
+            () -> {
+                RolePanelEditor editor = new RolePanelEditor();
+                return List.<ListenerAdapter>of(new RolePanelCommand(editor), editor, new RolePanelListener());
+            }),
     TICKETS("tickets", "ticket panels, ticket channels and transcripts",
             () -> List.<ListenerAdapter>of(new Ticket(), new TicketButton(), new TicketPanelEditor())),
     WELCOMER("welcomer", "welcome messages for new members",

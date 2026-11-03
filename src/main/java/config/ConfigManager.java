@@ -41,6 +41,7 @@ public class ConfigManager {
               activity: true      # admin-only /activity
               moderation: true    # /ban, /kick, /purge
               reaction-roles: true # /reaction-roles
+              role-panels: true   # /rolepanel: role menus with buttons, dropdown or reactions
               tickets: true       # ticket panels, ticket channels and transcripts
               welcomer: true      # welcome messages for new members
               embeds: true        # /embed and /rules
