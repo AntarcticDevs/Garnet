@@ -8,6 +8,9 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
+import database.Database;
+import utils.Log;
+
 import java.io.IOException;
 import java.nio.file.*;
 import java.time.*;
@@ -72,7 +75,7 @@ public class ActivityManager extends ListenerAdapter {
     private static final int MAX_HISTORY = 50;
     private static final int MAX_TEXT = 128;
 
-    private final Path file = Path.of("data/activity.json");
+    private final Path file = resolveFile();
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final Map<String, String> lastFired = new ConcurrentHashMap<>();
@@ -86,6 +89,16 @@ public class ActivityManager extends ListenerAdapter {
     private boolean shutdown;
 
     private ActivityManager() {}
+
+    private static Path resolveFile() {
+        Path file = Database.dataFile("activity.json");
+        // Bots that set database-path after already using data/activity.json keep their file.
+        Path legacy = Path.of("data", "activity.json");
+        if (!Files.exists(file) && Files.exists(legacy)) {
+            return legacy;
+        }
+        return file;
+    }
 
     // ---------- lifecycle ----------
 
@@ -144,7 +157,9 @@ public class ActivityManager extends ListenerAdapter {
     public synchronized void reset() {
         stopRotation();
         data.current = null;
-        jda.getPresence().setActivity(null);
+        if (jda != null) {
+            jda.getPresence().setActivity(null);
+        }
         save();
     }
 
@@ -341,13 +356,30 @@ public class ActivityManager extends ListenerAdapter {
     // ---------- persistence ----------
 
     private void load() {
+        if (!Files.exists(file)) {
+            return;
+        }
         try {
-            if (Files.exists(file)) {
-                Data loaded = gson.fromJson(Files.readString(file), Data.class);
-                if (loaded != null) data = loaded;
+            Data loaded = gson.fromJson(Files.readString(file), Data.class);
+            if (loaded != null) {
+                if (loaded.rotation == null) loaded.rotation = new Rotation();
+                if (loaded.rotation.presets == null) loaded.rotation.presets = new ArrayList<>();
+                if (loaded.presets == null) loaded.presets = new LinkedHashMap<>();
+                if (loaded.schedule == null) loaded.schedule = new ArrayList<>();
+                if (loaded.events == null) loaded.events = new ArrayList<>();
+                if (loaded.history == null) loaded.history = new ArrayList<>();
+                data = loaded;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            // Don't let the next save overwrite a file that couldn't be read: keep a copy of it.
+            Path backup = file.resolveSibling("activity.json.broken-" + System.currentTimeMillis());
+            try {
+                Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);
+                Log.error("Couldn't read " + file + "; the activity settings start empty. "
+                        + "The unreadable file was kept as " + backup.getFileName() + ".", e);
+            } catch (IOException copyError) {
+                Log.error("Couldn't read " + file + " and couldn't back it up either.", e);
+            }
         }
     }
 
@@ -358,7 +390,7 @@ public class ActivityManager extends ListenerAdapter {
             Files.writeString(tmp, gson.toJson(data));
             Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException e) {
-            e.printStackTrace();
+            Log.error("Couldn't save the activity settings to " + file, e);
         }
     }
 }
