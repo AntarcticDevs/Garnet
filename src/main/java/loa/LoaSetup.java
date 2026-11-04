@@ -35,7 +35,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** The /loa setup editor: review channel, LOA role, reviewer and ping roles, and the rules. */
 public class LoaSetup extends ListenerAdapter {
     private static final String PREFIX = "loas:";
 
@@ -54,7 +53,6 @@ public class LoaSetup extends ListenerAdapter {
         return settings;
     }
 
-    // ---------------------------------------------------------------- rendering
 
     private MessageEditData view(LoaStore.Settings settings, Guild guild, String notice) {
         return new MessageEditBuilder().useComponentsV2().setComponents(render(settings, guild, notice)).build();
@@ -100,11 +98,6 @@ public class LoaSetup extends ListenerAdapter {
         children.add(Section.of(Button.secondary(PREFIX + "limits", "Edit"), TextDisplay.of("**Rules**\n"
                 + "Reason: at least " + settings.minReason + " characters\nLongest leave: "
                 + (settings.maxDays <= 0 ? "no limit" : settings.maxDays + " days"))));
-        children.add(Section.of(
-                settings.blockAi ? Button.danger(PREFIX + "ai", "Turn off") : Button.success(PREFIX + "ai", "Turn on"),
-                TextDisplay.of("**AI-text check:** " + (settings.blockAi ? "on" : "off")
-                        + "\n-# Rejects reasons containing phrases such as \"as an ai\". It is a rough check "
-                        + "and can be wrong.")));
         children.add(Section.of(Button.secondary(PREFIX + "name", "Edit"), TextDisplay.of("**Display name**\n"
                 + (settings.displayName == null ? "*the server name*" : settings.displayName)
                 + "\n-# Shown in the footer of requests and in direct messages.")));
@@ -129,7 +122,6 @@ public class LoaSetup extends ListenerAdapter {
         return menu.build();
     }
 
-    // ---------------------------------------------------------------- plumbing
 
     private static boolean allowed(IReplyCallback event) {
         Member member = event.getMember();
@@ -156,7 +148,6 @@ public class LoaSetup extends ListenerAdapter {
         event.editMessage(view(settings, event.getGuild(), notice)).queue();
     }
 
-    // ---------------------------------------------------------------- events
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
@@ -174,10 +165,6 @@ public class LoaSetup extends ListenerAdapter {
                 case "name" -> event.replyModal(Modal.create(PREFIX + "name", "Display name").addComponents(
                         Label.of("Name (blank = the server name)", input("name", 60,
                                 settings.displayName, "My Staff Team"))).build()).queue();
-                case "ai" -> {
-                    settings.blockAi = !settings.blockAi;
-                    saveAndRefresh(event, settings, "✅ Saved.");
-                }
                 default -> event.reply("That control isn't available.").setEphemeral(true).queue();
             }
         } catch (SQLException exception) {
@@ -269,7 +256,6 @@ public class LoaSetup extends ListenerAdapter {
         }
     }
 
-    // ---------------------------------------------------------------- helpers
 
     private static List<String> ids(List<IMentionable> values) {
         return values.stream().filter(Role.class::isInstance).map(Role.class::cast)

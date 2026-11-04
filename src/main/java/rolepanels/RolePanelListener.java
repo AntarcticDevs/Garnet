@@ -16,7 +16,6 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Handles clicks, dropdown choices and reactions on posted role panels. */
 public class RolePanelListener extends ListenerAdapter {
 
     @Override
@@ -77,7 +76,6 @@ public class RolePanelListener extends ListenerAdapter {
                 return;
             }
             event.deferReply(true).queue();
-            // Put the menu back to "nothing chosen", so the same role can be picked again straight away.
             event.getMessage().editMessageComponents(RolePanelRenderer.buildComponents(panel, event.getGuild()))
                     .queue(null, error -> { });
             RolePanelService.pick(event.getGuild(), event.getMember(), panel, picked,
@@ -99,7 +97,6 @@ public class RolePanelListener extends ListenerAdapter {
     }
 
     private void handleReaction(GenericMessageReactionEvent event, boolean added) {
-        // Reactions in DMs have no guild, and the bot's own setup reactions must not count.
         if (!event.isFromGuild() || event.getUserId().equals(event.getJDA().getSelfUser().getId())
                 || (event.getUser() != null && event.getUser().isBot())) {
             return;
@@ -136,7 +133,6 @@ public class RolePanelListener extends ListenerAdapter {
                         event.getGuildChannel().removeReactionById(event.getMessageId(), event.getEmoji(), user)
                                 .queue(null, error -> { });
                     }
-                    // Pick-one panels: also take the member's reactions for the roles that were swapped out.
                     for (RolePanelData.PanelRole other : panel.roles) {
                         if (other == chosen || other.roleId == null) {
                             continue;
@@ -152,7 +148,6 @@ public class RolePanelListener extends ListenerAdapter {
                 error -> Log.warn("Couldn't load member " + event.getUserId() + " for a role panel reaction", error));
     }
 
-    /** If a posted panel is deleted, forget the message so the editor offers to post it again. */
     @Override
     public void onMessageDelete(MessageDeleteEvent event) {
         if (event.isFromGuild()) {

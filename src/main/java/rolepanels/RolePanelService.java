@@ -16,13 +16,11 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/** The rules of a role panel: who may use it and which roles a pick adds or removes. */
 public final class RolePanelService {
 
     private RolePanelService() {
     }
 
-    /** Why this member may not use the panel at all, or null when they may. */
     public static String denial(Guild guild, Member member, RolePanelData panel) {
         if (panel.disabled) {
             return panel.disabledMessage == null || panel.disabledMessage.isBlank()
@@ -44,7 +42,6 @@ public final class RolePanelService {
         return null;
     }
 
-    /** Why the bot can't hand out this role, or null when it can. */
     private static String cannotAssign(Guild guild, Role role) {
         if (!guild.getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
             return "I'm missing the Manage Roles permission, so I can't change roles. Please tell a moderator.";
@@ -67,10 +64,6 @@ public final class RolePanelService {
         return held;
     }
 
-    /**
-     * A button click or dropdown choice. {@code reply} gets the private message for the member.
-     * Every picked role is toggled (or added / removed / swapped, depending on the panel's mode).
-     */
     public static void pick(Guild guild, Member member, RolePanelData panel,
             List<RolePanelData.PanelRole> picked, Consumer<String> reply) {
         String denied = denial(guild, member, panel);
@@ -161,10 +154,6 @@ public final class RolePanelService {
                 });
     }
 
-    /**
-     * A reaction was added ({@code added}) or removed on a reactions-style panel. {@code keepReaction}
-     * is told whether the member's reaction should stay (false: remove it, nothing was granted).
-     */
     public static void react(Guild guild, Member member, RolePanelData panel, RolePanelData.PanelRole entry,
             boolean added, BiConsumer<Boolean, Set<Role>> keepReaction) {
         Role role = guild.getRoleById(entry.roleId);
@@ -205,7 +194,6 @@ public final class RolePanelService {
                 }
             }
         } else {
-            // Taking the reaction back gives the role up again (but never where roles can't be removed).
             if (panel.mode != RolePanelData.Mode.ADD_ONLY && has && !panel.disabled) {
                 remove.add(role);
             }

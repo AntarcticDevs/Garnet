@@ -4,19 +4,13 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Reading and showing durations, and the optional "written by an AI" check. */
 final class LoaText {
     private static final Pattern WHOLE = Pattern.compile("^(\\s*\\d{1,6}\\s*[mhdw]\\s*)+$");
     private static final Pattern PART = Pattern.compile("(\\d{1,6})\\s*([mhdw])");
-    private static final String[] AI_PHRASES = {
-            "as an ai", "language model", "delve into", "i hope this message finds you well",
-            "it is important to note", "in conclusion", "testament to"
-    };
 
     private LoaText() {
     }
 
-    /** "12h", "3d", "1w", "1w 2d", "90m" to milliseconds, or -1 when it can't be read. */
     static long parseDuration(String input) {
         String text = input == null ? "" : input.toLowerCase(Locale.ROOT).trim();
         if (!WHOLE.matcher(text).matches()) {
@@ -53,16 +47,6 @@ final class LoaText {
             text.append(mins).append(mins == 1 ? " minute" : " minutes");
         }
         return text.toString().trim();
-    }
-
-    static boolean looksLikeAi(String text) {
-        String lower = text.toLowerCase(Locale.ROOT);
-        for (String phrase : AI_PHRASES) {
-            if (lower.contains(phrase)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     static String truncate(String value, int max) {

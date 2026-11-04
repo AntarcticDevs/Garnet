@@ -10,7 +10,6 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Reads and writes role panels. The tables are created by {@link #createTables(Connection)} at startup. */
 public final class RolePanelStore {
 
     private RolePanelStore() {
@@ -58,7 +57,6 @@ public final class RolePanelStore {
         }
     }
 
-    /** Creates or updates the panel (matched by server and name) together with its roles, in order. */
     public static void save(RolePanelData panel) throws SQLException {
         try (Connection connection = Database.getConnection()) {
             connection.setAutoCommit(false);
@@ -128,10 +126,6 @@ public final class RolePanelStore {
         }
     }
 
-    /**
-     * Rewrites the panel's roles in order. Existing rows keep their ids, because buttons already posted
-     * in Discord refer to them.
-     */
     private static void replaceRoles(Connection connection, RolePanelData panel) throws SQLException {
         List<Integer> keep = new ArrayList<>();
         for (RolePanelData.PanelRole role : panel.roles) {
@@ -155,7 +149,6 @@ public final class RolePanelStore {
                 delete.executeBatch();
             }
         }
-        // Positions are shifted out of the way first so reordering never trips the unique constraint.
         try (PreparedStatement shift = connection.prepareStatement(
                 "UPDATE role_panel_roles SET position = position + 1000 WHERE panel_id = ?")) {
             shift.setInt(1, panel.id);
@@ -270,7 +263,6 @@ public final class RolePanelStore {
         }
     }
 
-    /** Remembers where the panel is posted. Pass null for both after the message was deleted. */
     public static void saveMessage(int panelId, String channelId, String messageId) throws SQLException {
         try (Connection connection = Database.getConnection();
                 PreparedStatement statement = connection.prepareStatement(
@@ -282,7 +274,6 @@ public final class RolePanelStore {
         }
     }
 
-    /** Forgets the posted message of whichever panel used it (the message was deleted). */
     public static void clearMessage(String guildId, String messageId) throws SQLException {
         try (Connection connection = Database.getConnection();
                 PreparedStatement statement = connection.prepareStatement(

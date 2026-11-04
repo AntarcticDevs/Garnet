@@ -17,7 +17,6 @@ import utils.Log;
 import java.sql.SQLException;
 import java.util.List;
 
-/** /rolepanel create, edit and list. Everything else happens in the editor. */
 public class RolePanelCommand extends ListenerAdapter implements Command {
     private final RolePanelEditor editor;
 

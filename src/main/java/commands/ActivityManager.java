@@ -20,12 +20,11 @@ import java.util.concurrent.*;
 
 public class ActivityManager extends ListenerAdapter {
 
-    // ---------- data model (this is what gets saved to JSON) ----------
 
     public static class Spec {
-        public String type;   // playing, watching, listening, competing, custom, streaming
-        public String text;   // may contain placeholders
-        public String url;    // streaming only
+        public String type;
+        public String text;
+        public String url;
 
         public Spec() {}
         public Spec(String type, String text, String url) {
@@ -42,19 +41,19 @@ public class ActivityManager extends ListenerAdapter {
     public static class Rotation {
         public boolean enabled = false;
         public int intervalSeconds = 60;
-        public String mode = "sequential";           // or "random"
+        public String mode = "sequential";
         public List<String> presets = new ArrayList<>();
     }
 
     public static class ScheduleEntry {
-        public String time;    // "22:00"
+        public String time;
         public String zone = "UTC";
         public String preset;
     }
 
     public static class EventRule {
-        public String event;   // MEMBER_MILESTONE, GIVEAWAY_START, MAINTENANCE_START...
-        public Integer value;  // optional (e.g. 100 members)
+        public String event;
+        public Integer value;
         public String preset;
     }
 
@@ -67,7 +66,6 @@ public class ActivityManager extends ListenerAdapter {
         public List<HistoryEntry> history = new ArrayList<>();
     }
 
-    // ---------- state ----------
 
     private static final ActivityManager INSTANCE = new ActivityManager();
     public static ActivityManager get() { return INSTANCE; }
@@ -92,7 +90,6 @@ public class ActivityManager extends ListenerAdapter {
 
     private static Path resolveFile() {
         Path file = Database.dataFile("activity.json");
-        // Bots that set database-path after already using data/activity.json keep their file.
         Path legacy = Path.of("data", "activity.json");
         if (!Files.exists(file) && Files.exists(legacy)) {
             return legacy;
@@ -100,9 +97,7 @@ public class ActivityManager extends ListenerAdapter {
         return file;
     }
 
-    // ---------- lifecycle ----------
 
-    /** Call once after JDA is ready (e.g. in a ReadyEvent listener). */
     public synchronized void init(JDA jda) {
         if (shutdown) {
             throw new IllegalStateException("ActivityManager cannot be restarted after shutdown");
@@ -115,7 +110,7 @@ public class ActivityManager extends ListenerAdapter {
         if (data.rotation.enabled) {
             startRotation();
         } else if (data.current != null) {
-            applyInternal(data.current, null);   // restore after restart
+            applyInternal(data.current, null);
         }
         scheduler.scheduleAtFixedRate(this::checkSchedule, 10, 30, TimeUnit.SECONDS);
         initialized = true;
@@ -140,9 +135,7 @@ public class ActivityManager extends ListenerAdapter {
         }
     }
 
-    // ---------- manual control (used by /activity) ----------
 
-    /** Sets an activity manually. Stops rotation so it doesn't get overwritten. */
     public synchronized String set(Spec spec, Guild context, String userId) {
         String error = validate(spec);
         if (error != null) return error;
@@ -163,7 +156,6 @@ public class ActivityManager extends ListenerAdapter {
         save();
     }
 
-    // ---------- presets ----------
 
     public synchronized String savePreset(String name, Spec spec) {
         String error = validate(spec);
@@ -203,7 +195,6 @@ public class ActivityManager extends ListenerAdapter {
         return new ArrayList<>(data.history.subList(from, data.history.size()));
     }
 
-    // ---------- rotation ----------
 
     public synchronized String configureRotation(List<String> presetNames, int seconds, String mode) {
         if (seconds < 30) return "Interval must be at least 30 seconds (Discord rate limits).";
@@ -248,7 +239,6 @@ public class ActivityManager extends ListenerAdapter {
         if (spec != null) applyInternal(spec, null);
     }
 
-    // ---------- schedule ----------
 
     public synchronized String addSchedule(String time, String zone, String preset) {
         try {
@@ -284,7 +274,6 @@ public class ActivityManager extends ListenerAdapter {
         }
     }
 
-    // ---------- event-based ----------
 
     public synchronized String addEventRule(String event, Integer value, String preset) {
         if (!data.presets.containsKey(preset.toLowerCase())) return "Unknown preset.";
@@ -295,7 +284,6 @@ public class ActivityManager extends ListenerAdapter {
         return null;
     }
 
-    /** Call from your listeners, e.g. onEvent("MEMBER_MILESTONE", guild.getMemberCount(), guild). */
     public synchronized void onEvent(String event, Integer value, Guild guild) {
         for (EventRule r : data.events) {
             if (!r.event.equalsIgnoreCase(event)) continue;
@@ -310,7 +298,6 @@ public class ActivityManager extends ListenerAdapter {
         }
     }
 
-    // ---------- applying ----------
 
     private void applyInternal(Spec spec, Guild context) {
         String text = resolvePlaceholders(spec.text, context);
@@ -353,7 +340,6 @@ public class ActivityManager extends ListenerAdapter {
         while (data.history.size() > MAX_HISTORY) data.history.remove(0);
     }
 
-    // ---------- persistence ----------
 
     private void load() {
         if (!Files.exists(file)) {
@@ -371,7 +357,6 @@ public class ActivityManager extends ListenerAdapter {
                 data = loaded;
             }
         } catch (Exception e) {
-            // Don't let the next save overwrite a file that couldn't be read: keep a copy of it.
             Path backup = file.resolveSibling("activity.json.broken-" + System.currentTimeMillis());
             try {
                 Files.copy(file, backup, StandardCopyOption.REPLACE_EXISTING);

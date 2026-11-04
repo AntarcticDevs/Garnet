@@ -44,7 +44,6 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/** The in-Discord editor of a role panel (/rolepanel create and /rolepanel edit). */
 public class RolePanelEditor extends ListenerAdapter {
     private static final String PREFIX = "rpe:";
     private static final Pattern HEX_COLOUR = Pattern.compile("^#?[0-9a-fA-F]{6}$");
@@ -89,7 +88,6 @@ public class RolePanelEditor extends ListenerAdapter {
                 .setEphemeral(true).queue();
     }
 
-    // ---------------------------------------------------------------- ids
 
     private static String id(RolePanelData panel, Page page, String action) {
         return PREFIX + panel.id + ":" + page.key + ":" + action;
@@ -99,7 +97,6 @@ public class RolePanelEditor extends ListenerAdapter {
         return id(panel, page, action) + ":" + arg;
     }
 
-    // ---------------------------------------------------------------- rendering
 
     private MessageEditData view(RolePanelData panel, Page page, Guild guild, String notice, int roleIndex) {
         return new MessageEditBuilder().useComponentsV2()
@@ -323,7 +320,6 @@ public class RolePanelEditor extends ListenerAdapter {
         return menu.build();
     }
 
-    // ---------------------------------------------------------------- plumbing
 
     private Ctx resolve(IReplyCallback event, String customId) {
         Guild guild = event.getGuild();
@@ -365,7 +361,6 @@ public class RolePanelEditor extends ListenerAdapter {
         event.editMessage(view(panel, page, event.getGuild(), notice, roleIndex)).queue();
     }
 
-    /** Saves, reloads (new roles get their ids) and redraws the editor. */
     private <E extends IMessageEditCallback & IReplyCallback> void saveAndRefresh(
             E event, Ctx ctx, String notice, int roleIndex) {
         RolePanelData panel = ctx.panel();
@@ -391,7 +386,6 @@ public class RolePanelEditor extends ListenerAdapter {
         }
     }
 
-    // ---------------------------------------------------------------- buttons
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
@@ -616,7 +610,6 @@ public class RolePanelEditor extends ListenerAdapter {
         event.editMessage(plainView("**Deleted** the role panel `" + truncate(panel.name, 60) + "`.")).queue();
     }
 
-    // ---------------------------------------------------------------- selects
 
     @Override
     public void onStringSelectInteraction(StringSelectInteractionEvent event) {
@@ -739,7 +732,6 @@ public class RolePanelEditor extends ListenerAdapter {
                 .findFirst().orElse(null);
     }
 
-    /** Why this role can't be offered (null = fine). */
     private static String unusable(Guild guild, Member editor, Role role) {
         if (role.isPublicRole()) {
             return "is @everyone and can't be offered";
@@ -756,7 +748,6 @@ public class RolePanelEditor extends ListenerAdapter {
         return null;
     }
 
-    // ---------------------------------------------------------------- modals
 
     @Override
     public void onModalInteraction(ModalInteractionEvent event) {
@@ -835,7 +826,6 @@ public class RolePanelEditor extends ListenerAdapter {
         }
     }
 
-    // ---------------------------------------------------------------- helpers
 
     private static TextInput input(
             String id, TextInputStyle style, int maxLength, String value, String placeholder, boolean required) {

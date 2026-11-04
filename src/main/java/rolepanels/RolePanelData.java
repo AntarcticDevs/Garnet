@@ -3,11 +3,9 @@ package rolepanels;
 import java.util.ArrayList;
 import java.util.List;
 
-/** A role panel: one message with buttons, a dropdown or reactions that give members roles. */
 public class RolePanelData {
     public static final int MAX_ROLES = 25;
 
-    /** How members pick roles. */
     public enum Style {
         BUTTONS("Buttons"),
         DROPDOWN("Dropdown menu"),
@@ -29,7 +27,6 @@ public class RolePanelData {
         }
     }
 
-    /** What picking a role does. */
     public enum Mode {
         TOGGLE("Toggle", "Pick a role to get it, pick it again to lose it"),
         UNIQUE("Pick one", "Only one role from this panel at a time (colours, regions)"),
@@ -54,14 +51,13 @@ public class RolePanelData {
         }
     }
 
-    /** One role offered by a panel. */
     public static class PanelRole {
         public int id;
         public String roleId;
-        public String label;        // button/option text; null = the role's name
-        public String emoji;        // formatted emoji; required for the reactions style
-        public String description;  // dropdown option description
-        public String buttonStyle;  // PRIMARY, SECONDARY, SUCCESS or DANGER; null = SECONDARY
+        public String label;
+        public String emoji;
+        public String description;
+        public String buttonStyle;
 
         public PanelRole() {
         }
@@ -84,9 +80,9 @@ public class RolePanelData {
 
     public Style style = Style.BUTTONS;
     public Mode mode = Mode.TOGGLE;
-    public int maxRoles;              // 0 = no limit (toggle and add only)
-    public String requiredRoleId;     // members need this role to use the panel
-    public String blockedRoleId;      // members with this role can't use the panel
+    public int maxRoles;
+    public String requiredRoleId;
+    public String blockedRoleId;
     public boolean disabled;
     public String disabledMessage;
 

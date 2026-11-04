@@ -12,7 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Saves the Leave of Absence settings of each server and every request that was made. */
 public final class LoaStore {
     public static final String PENDING = "PENDING";
     public static final String APPROVED = "APPROVED";
@@ -22,7 +21,6 @@ public final class LoaStore {
     private LoaStore() {
     }
 
-    /** One server's setup. Null ids mean "not chosen yet". */
     public static final class Settings {
         public String guildId;
         public String channelId;
@@ -30,9 +28,8 @@ public final class LoaStore {
         public List<String> reviewerRoleIds = new ArrayList<>();
         public List<String> pingRoleIds = new ArrayList<>();
         public int minReason = 30;
-        public int maxDays = 90;      // 0 = no limit
-        public boolean blockAi;
-        public String displayName;    // shown in titles and footers; null = the server name
+        public int maxDays = 90;
+        public String displayName;
 
         public boolean ready() {
             return channelId != null && roleId != null;
@@ -69,7 +66,6 @@ public final class LoaStore {
                         ping_roles TEXT,
                         min_reason INTEGER NOT NULL DEFAULT 30,
                         max_days INTEGER NOT NULL DEFAULT 90,
-                        block_ai INTEGER NOT NULL DEFAULT 0,
                         display_name TEXT
                     )
                     """);
@@ -97,7 +93,6 @@ public final class LoaStore {
         }
     }
 
-    // ---------------------------------------------------------------- settings
 
     public static Settings getSettings(String guildId) throws SQLException {
         try (Connection connection = Database.getConnection();
@@ -116,7 +111,6 @@ public final class LoaStore {
                 settings.pingRoleIds = split(resultSet.getString("ping_roles"));
                 settings.minReason = resultSet.getInt("min_reason");
                 settings.maxDays = resultSet.getInt("max_days");
-                settings.blockAi = resultSet.getInt("block_ai") != 0;
                 settings.displayName = resultSet.getString("display_name");
                 return settings;
             }
@@ -127,13 +121,12 @@ public final class LoaStore {
         try (Connection connection = Database.getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
                         INSERT INTO loa_settings (guild_id, channel_id, role_id, reviewer_roles, ping_roles,
-                            min_reason, max_days, block_ai, display_name)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            min_reason, max_days, display_name)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id,
                             role_id = excluded.role_id, reviewer_roles = excluded.reviewer_roles,
                             ping_roles = excluded.ping_roles, min_reason = excluded.min_reason,
-                            max_days = excluded.max_days, block_ai = excluded.block_ai,
-                            display_name = excluded.display_name
+                            max_days = excluded.max_days, display_name = excluded.display_name
                         """)) {
             statement.setString(1, settings.guildId);
             statement.setString(2, settings.channelId);
@@ -142,8 +135,7 @@ public final class LoaStore {
             statement.setString(5, String.join(",", settings.pingRoleIds));
             statement.setInt(6, settings.minReason);
             statement.setInt(7, settings.maxDays);
-            statement.setInt(8, settings.blockAi ? 1 : 0);
-            statement.setString(9, settings.displayName);
+            statement.setString(8, settings.displayName);
             statement.executeUpdate();
         }
     }
@@ -160,7 +152,6 @@ public final class LoaStore {
         return ids;
     }
 
-    // ---------------------------------------------------------------- requests
 
     public static int createRequest(String guildId, String userId, String reason, String ign, String rank,
             long durationMs) throws SQLException {
@@ -190,7 +181,6 @@ public final class LoaStore {
         return queryOne("SELECT * FROM loa_requests WHERE guild_id = ? AND id = ?", guildId, id);
     }
 
-    /** The member's pending request or running LOA, if they have one. */
     public static Request findOpen(String guildId, String userId) throws SQLException {
         return queryOne("SELECT * FROM loa_requests WHERE guild_id = ? AND user_id = ? "
                 + "AND (status = 'PENDING' OR (status = 'APPROVED' AND ended = 0)) "
@@ -201,7 +191,6 @@ public final class LoaStore {
         update("UPDATE loa_requests SET channel_id = ?, message_id = ? WHERE id = ?", channelId, messageId, id);
     }
 
-    /** Approves a pending request. False if somebody else already handled it. */
     public static boolean approve(int id, String reviewerId, long endsAt) throws SQLException {
         return update("UPDATE loa_requests SET status = 'APPROVED', reviewer_id = ?, reviewed_at = ?, "
                 + "ends_at = ? WHERE id = ? AND status = 'PENDING'",
@@ -219,12 +208,10 @@ public final class LoaStore {
                 + "WHERE id = ? AND status = 'PENDING'", System.currentTimeMillis(), id) > 0;
     }
 
-    /** Marks a running LOA as over. False if it was already over. */
     public static boolean markEnded(int id) throws SQLException {
         return update("UPDATE loa_requests SET ended = 1 WHERE id = ? AND status = 'APPROVED' AND ended = 0", id) > 0;
     }
 
-    /** Approved LOAs whose time has run out, in every server. */
     public static List<Request> due(long now) throws SQLException {
         return queryMany("SELECT * FROM loa_requests WHERE status = 'APPROVED' AND ended = 0 AND ends_at <= ?",
                 now);
@@ -240,7 +227,6 @@ public final class LoaStore {
                 guildId);
     }
 
-    /** Reviewer id to {approved, denied}; most active first. */
     public static Map<String, int[]> reviewerStats(String guildId) throws SQLException {
         Map<String, int[]> stats = new LinkedHashMap<>();
         try (Connection connection = Database.getConnection();
@@ -262,7 +248,6 @@ public final class LoaStore {
         return stats;
     }
 
-    // ---------------------------------------------------------------- helpers
 
     private static int update(String sql, Object... values) throws SQLException {
         try (Connection connection = Database.getConnection();

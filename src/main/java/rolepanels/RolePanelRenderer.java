@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-/** Builds the message of a role panel and posts or updates it. */
 public final class RolePanelRenderer {
     public static final String DEFAULT_DISABLED_MESSAGE = "This role panel is currently disabled.";
     private static final Color DEFAULT_COLOUR = new Color(0x5865F2);
@@ -37,7 +36,6 @@ public final class RolePanelRenderer {
         return "rp:s:" + panel.id;
     }
 
-    /** What the member sees for this role: the custom label, or the role's name. */
     public static String labelFor(RolePanelData.PanelRole role, Guild guild) {
         if (role.label != null && !role.label.isBlank()) {
             return role.label;
@@ -94,7 +92,6 @@ public final class RolePanelRenderer {
         return embed.build();
     }
 
-    /** The buttons or dropdown; empty for the reactions style (and for a panel without roles). */
     public static List<ActionRow> buildComponents(RolePanelData panel, Guild guild) {
         List<ActionRow> rows = new ArrayList<>();
         if (panel.roles.isEmpty()) {
@@ -140,10 +137,6 @@ public final class RolePanelRenderer {
         return rows;
     }
 
-    /**
-     * Posts the panel, or edits the message it was posted in before (when it still exists in the same
-     * channel). The caller stores the resulting message with {@link RolePanelStore#saveMessage}.
-     */
     public static RestAction<Message> publish(RolePanelData panel, GuildMessageChannel channel) {
         MessageEmbed embed = buildEmbed(panel, channel.getGuild());
         List<ActionRow> rows = buildComponents(panel, channel.getGuild());
@@ -160,10 +153,6 @@ public final class RolePanelRenderer {
                 });
     }
 
-    /**
-     * After posting: the reactions style gets one reaction per role (in order), every other style has its
-     * reactions cleared. Needs Add Reactions, and Manage Messages to clear; missing permissions are ignored.
-     */
     public static void syncReactions(Message message, RolePanelData panel) {
         if (panel.style != RolePanelData.Style.REACTIONS) {
             if (!message.getReactions().isEmpty()) {

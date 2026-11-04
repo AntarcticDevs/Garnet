@@ -40,7 +40,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/** /loa: members ask for a Leave of Absence, reviewers approve or deny, the role is removed when it ends. */
 public class LoaCommand extends ListenerAdapter implements Command {
     private static final String APPROVE = "loa:approve:";
     private static final String DENY = "loa:deny:";
@@ -83,9 +82,7 @@ public class LoaCommand extends ListenerAdapter implements Command {
                         new SubcommandData("setup", "Choose the review channel, the LOA role and the rules"));
     }
 
-    // ---------------------------------------------------------------- lifecycle
 
-    /** Checks every minute for leaves that ran out, so nothing is lost when the bot restarts. */
     @Override
     public synchronized void onReady(ReadyEvent event) {
         if (sweeper != null) {
@@ -108,7 +105,6 @@ public class LoaCommand extends ListenerAdapter implements Command {
         }, 5, 60, TimeUnit.SECONDS);
     }
 
-    // ---------------------------------------------------------------- slash commands
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
@@ -179,10 +175,6 @@ public class LoaCommand extends ListenerAdapter implements Command {
         if (reason.length() < settings.minReason) {
             reply(event, "❌ Your reason must be at least **" + settings.minReason + " characters** long. "
                     + "Please explain a little more.");
-            return;
-        }
-        if (settings.blockAi && LoaText.looksLikeAi(reason)) {
-            reply(event, "🤖 That reason looks copied from an AI. Please write it in your own words.");
             return;
         }
         if (durationMs < 3_600_000L) {
@@ -346,7 +338,6 @@ public class LoaCommand extends ListenerAdapter implements Command {
         event.reply(text.toString()).setEphemeral(true).setAllowedMentions(List.of()).queue();
     }
 
-    // ---------------------------------------------------------------- review buttons
 
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
@@ -496,18 +487,13 @@ public class LoaCommand extends ListenerAdapter implements Command {
         }
     }
 
-    // ---------------------------------------------------------------- ending a leave
 
-    /**
-     * Ends a running leave: marks it over, takes the role away and tells the applicant. Used when the time
-     * runs out, when the member returns early and when a reviewer ends it.
-     */
     private void endLeave(JDA jda, LoaStore.Request request, String message, boolean early) {
         try {
             LoaStore.Settings settings = LoaStore.getSettings(request.guildId);
             Guild guild = jda.getGuildById(request.guildId);
             if (guild == null || settings == null) {
-                return; // try again on the next sweep instead of ending the leave without removing the role
+                return;
             }
             if (!LoaStore.markEnded(request.id)) {
                 return;
@@ -535,7 +521,6 @@ public class LoaCommand extends ListenerAdapter implements Command {
         }
     }
 
-    // ---------------------------------------------------------------- helpers
 
     private void updateReviewMessage(Guild guild, LoaStore.Request request, LoaStore.Settings settings, User applicant,
             String note) {
