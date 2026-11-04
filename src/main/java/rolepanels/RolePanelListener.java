@@ -11,7 +11,6 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.events.message.react.MessageReactionRemoveEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import utils.Log;
-import utils.ReactionEmojiParser;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
