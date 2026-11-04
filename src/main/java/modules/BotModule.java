@@ -15,6 +15,7 @@ import commands.Ticket;
 import commands.UserInfo;
 import config.ConfigManager;
 import events.WelcomeListener;
+import loa.LoaCommand;
 import logging.LogCommand;
 import logging.ServerLogListener;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
@@ -50,6 +51,11 @@ public enum BotModule {
             () -> List.<ListenerAdapter>of(new WelcomeListener())),
     EMBEDS("embeds", "/embed and /rules",
             () -> List.<ListenerAdapter>of(new Embeds(), new Rules())),
+    LOA("loa", "/loa: leave of absence requests with staff review",
+            () -> {
+                LoaCommand command = new LoaCommand();
+                return List.<ListenerAdapter>of(command, command.setupEditor());
+            }),
     LOGGING("logging", "/logs and the server and ticket log channel",
             () -> List.<ListenerAdapter>of(new LogCommand(), new ServerLogListener()));
 

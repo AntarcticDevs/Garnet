@@ -16,6 +16,7 @@ moderation, reaction roles, embeds and a welcomer. Every feature can be switched
 | **Role panels** | `/rolepanel`: a posted message where members pick roles with buttons, a dropdown or reactions; edited inside Discord |
 | **Reaction roles** | Choose emoji-reaction or button-style role assignment with `/reaction-roles`; mappings survive restarts |
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
+| **Leave of absence** | `/loa`: members request leave, staff approve or deny with buttons, the LOA role is added and removed automatically |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
 | **Activity** | Admin-only `/activity`; activity settings, presets, rotation, schedules and member milestones are stored in `data/activity.json` |
@@ -90,6 +91,7 @@ modules:                  # true = on, false = off
   reaction-roles: true
   tickets: true
   welcomer: true
+  loa: true
   embeds: true
   logging: true
 
@@ -182,6 +184,24 @@ The bot needs Manage Roles, its own role must sit above every role a panel hands
 Send Messages and Embed Links in the panel channel (plus Add Reactions for the reactions style). `/rolepanel edit name`
 reopens the editor and `/rolepanel list` shows every panel. `/reaction-roles` still works for putting roles on
 messages that already exist.
+
+## Leave of absence
+
+Run `/loa setup` (needs Manage Server) and choose the review channel and the LOA role. Optionally add reviewer
+roles, roles to ping for each request, the shortest reason, the longest leave and a display name for your team.
+
+- `/loa request reason duration [ign] [rank]`: a member asks for leave. Durations look like `12h`, `3d`, `1w` or
+  `1w 2d` (at least 1 hour). `ign` and `rank` are optional extra details for teams that use them.
+- The request appears in the review channel with **Approve** and **Deny** buttons. Only reviewers (the reviewer
+  roles, or anyone with Manage Server) can press them, nobody can review their own request, and a denial can
+  include a reason that is sent to the member.
+- On approval the member gets the LOA role. It is removed when the leave ends, even if the bot was restarted
+  in the meantime, and the member is told by direct message.
+- `/loa cancel` withdraws a pending request or ends a running leave early. Reviewers can use `/loa list`,
+  `/loa end member` and `/loa stats [reviewer]` (how many requests each reviewer approved or denied).
+
+The bot needs Manage Roles with its role above the LOA role, and View Channel, Send Messages and Embed Links in
+the review channel. Requests are saved in the database, so nothing is lost on restart.
 
 ## Reaction roles
 

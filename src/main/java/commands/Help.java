@@ -107,6 +107,14 @@ public class Help extends ListenerAdapter implements Command {
                     """
                     `/embed create`, `edit`, `send`, `delete` Build embeds, save them and post them anywhere.
                     `/rules select` Pick up to five saved embeds as this server's rules."""),
+            new Page(BotModule.LOA, "loa", "🏖️", "Leave of absence",
+                    "Members request leave, staff approve or deny",
+                    """
+                    `/loa request reason duration [ign] [rank]` Ask for leave (for example `3d` or `1w 2d`).
+                    `/loa cancel` Withdraw your request, or end your leave early.
+                    **Reviewers** `/loa list`, `/loa end member`, `/loa stats [reviewer]`, plus the Approve and Deny buttons.
+                    `/loa setup` Review channel, LOA role, reviewer and ping roles, rules. *Needs Manage Server.*
+                    The LOA role is added on approval and removed when the leave ends, even after a restart."""),
             new Page(BotModule.LOGGING, "logging", "📜", "Logging",
                     "A log channel for tickets, members, moderation and more",
                     """

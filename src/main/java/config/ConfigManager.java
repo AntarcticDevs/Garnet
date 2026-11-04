@@ -45,6 +45,7 @@ public class ConfigManager {
               tickets: true       # ticket panels, ticket channels and transcripts
               welcomer: true      # welcome messages for new members
               embeds: true        # /embed and /rules
+              loa: true           # /loa: leave of absence requests with staff review
               logging: true       # /logs: a log channel for tickets, members, moderation and more
 
             # Optional links shown as buttons in /help. Leave a link blank to hide its button.
