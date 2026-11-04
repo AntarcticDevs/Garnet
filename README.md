@@ -2,7 +2,7 @@
 
 Garnet is a self-hosted Discord bot engine written in Java. You run one jar, it creates its own
 `config.yml`, you paste in your bot token, and you have your own bot with tickets, logging,
-moderation, reaction roles, embeds and a welcomer. Every feature can be switched on or off in the config.
+moderation, role panels, reaction roles, leave of absence, embeds and a welcomer. Every feature can be switched on or off in the config.
 
 > Garnet is under active development. Run it on a test server first and keep backups of `data/`.
 
@@ -203,6 +203,19 @@ roles, roles to ping for each request, the shortest reason, the longest leave an
 The bot needs Manage Roles with its role above the LOA role, and View Channel, Send Messages and Embed Links in
 the review channel. Requests are saved in the database, so nothing is lost on restart.
 
+## Welcomer
+
+Greets new members with one of your saved embeds (build it with `/embed create`). Needs Manage Server.
+
+- `/welcomer setchannel channel` where welcome messages are posted, `/welcomer setembed` which saved embed is used.
+- `/welcomer ping on/off` whether the message mentions the new member.
+- `/welcomer enable` and `disable` turn it on or off without losing the settings.
+- `/welcomer test [user]` sends a test message.
+
+Placeholders you can use in the embed's text and image links: `{user}` (name), `{user_mention}`, `{server}`,
+`{member_count}`, `{member_count_ordinal}` (1st, 2nd, 3rd...), `{server_icon}` and `{member_avatar}`. They are
+filled in each time someone joins.
+
 ## Reaction roles
 
 `/reaction-roles add` puts a role on any message, either as a reaction or as a button. It needs Manage Server,
@@ -239,5 +252,5 @@ cd Garnet
 mvn package
 ```
 
-Java 21, JDA 6.7.0, SQLite (`sqlite-jdbc`) and SnakeYAML. To add a feature, add a constant to
+Java 21, JDA 6.7.0, SQLite (`sqlite-jdbc`), SnakeYAML and Gson. To add a feature, add a constant to
 `modules/BotModule.java` with the listeners it needs and a line to the `modules:` section in `ConfigManager`.
