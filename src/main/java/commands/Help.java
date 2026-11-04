@@ -101,7 +101,7 @@ public class Help extends ListenerAdapter implements Command {
                     `/welcomer ping on/off` Whether the welcome message mentions the new member.
                     `/welcomer enable`, `disable` Turn welcome messages on or off (settings are kept).
                     `/welcomer test [user]` Sends a test welcome message.
-                    *Needs Manage Server.* Placeholders for the embed: `{user}` `{user_mention}` `{server}` `{member_count}`."""),
+                    *Needs Manage Server.* Embed placeholders: `{user}` `{user_mention}` `{server}` `{member_count}` `{member_count_ordinal}` `{server_icon}` `{member_avatar}`."""),
             new Page(BotModule.EMBEDS, "embeds", "🧩", "Embeds & rules",
                     "Build and send custom embeds, set the rules",
                     """
