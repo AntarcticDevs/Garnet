@@ -294,6 +294,7 @@ public class Database {
             addColumnIfMissing(connection, "reaction_role_buttons", "channel_id TEXT");
 
             rolepanels.RolePanelStore.createTables(connection);
+            loa.LoaStore.createTables(connection);
 
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
 
