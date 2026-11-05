@@ -115,6 +115,15 @@ public class Help extends ListenerAdapter implements Command {
                     **Reviewers** `/loa list`, `/loa end member`, `/loa stats [reviewer]`, plus the Approve and Deny buttons.
                     `/loa setup` Review channel, LOA role, reviewer and ping roles, rules. *Needs Manage Server.*
                     The LOA role is added on approval and removed when the leave ends, even after a restart."""),
+            new Page(BotModule.TAGS, "tags", "🏷️", "Tags",
+                    "Custom commands that reply with a message or embed",
+                    """
+                    `/tag use name` Shows a tag. If the host enabled prefix triggers, members can also type the
+                    server's prefix and the name (for example `!ip`).
+                    `/tag list` Shows every tag in this server.
+                    `/tag set name [embed] [required-role]` Creates or edits a tag: a form asks for the text.
+                    `/tag delete name`, `/tag prefix [prefix]` Remove a tag, or choose the trigger prefix.
+                    *Managing tags needs Manage Server.* Text placeholders: `{user}` `{user_mention}` `{server}` `{member_count}`."""),
             new Page(BotModule.LOGGING, "logging", "📜", "Logging",
                     "A log channel for tickets, members, moderation and more",
                     """

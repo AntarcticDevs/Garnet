@@ -46,7 +46,13 @@ public class ConfigManager {
               welcomer: true      # welcome messages for new members
               embeds: true        # /embed and /rules
               loa: true           # /loa: leave of absence requests with staff review
+              tags: true          # /tag: custom commands such as !ip that reply with a message or embed
               logging: true       # /logs: a log channel for tickets, members, moderation and more
+
+            # Let tags answer to a prefix such as !ip (set per server with /tag prefix). This needs the
+            # "Message Content Intent": turn it on under "Privileged Gateway Intents" on the Bot tab of
+            # your application first, or the bot will not start. Leave false to use only /tag use.
+            tag-prefix-commands: false
 
             # Optional links shown as buttons in /help. Leave a link blank to hide its button.
             support-url: ''

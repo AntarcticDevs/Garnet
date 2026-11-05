@@ -17,6 +17,7 @@ import config.ConfigManager;
 import events.WelcomeListener;
 import loa.LoaCommand;
 import logging.LogCommand;
+import tags.TagCommand;
 import logging.ServerLogListener;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import rolepanels.RolePanelCommand;
@@ -56,6 +57,8 @@ public enum BotModule {
                 LoaCommand command = new LoaCommand();
                 return List.<ListenerAdapter>of(command, command.setupEditor());
             }),
+    TAGS("tags", "/tag: custom commands that answer with a message or embed",
+            () -> List.<ListenerAdapter>of(new TagCommand())),
     LOGGING("logging", "/logs and the server and ticket log channel",
             () -> List.<ListenerAdapter>of(new LogCommand(), new ServerLogListener()));
 

@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.exceptions.InvalidTokenException;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import java.util.EnumSet;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -87,8 +88,12 @@ public class Main {
 
         JDA jda;
         try {
+            EnumSet<GatewayIntent> intents = EnumSet.of(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS);
+            if (BotModule.TAGS.isEnabled() && ConfigManager.getBoolean("tag-prefix-commands", false)) {
+                intents.add(GatewayIntent.MESSAGE_CONTENT);
+            }
             jda = JDABuilder.createDefault(token)
-                    .enableIntents(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS)
+                    .enableIntents(intents)
                     .addEventListeners(listeners.toArray())
                     .build()
                     .awaitReady();
@@ -101,7 +106,8 @@ public class Main {
             String reason = String.valueOf(e.getMessage());
             ConsoleLogger.logConsole("Couldn't connect to Discord: " + reason.replace("\n", " "));
             if (reason.toLowerCase(java.util.Locale.ROOT).contains("intent")) {
-                ConsoleLogger.logConsole("Turn on \"Server Members Intent\" under Privileged Gateway Intents "
+                ConsoleLogger.logConsole("Turn on \"Server Members Intent\" (and \"Message Content Intent\" if "
+                        + "tag-prefix-commands is true in config.yml) under Privileged Gateway Intents "
                         + "on the Bot tab of your application at https://discord.com/developers/applications, "
                         + "then start the bot again.");
             }
