@@ -197,7 +197,8 @@ public class TagCommand extends ListenerAdapter implements Command {
         }
         event.replyModal(Modal.create(MODAL + name + ":" + (embedId == null ? "-" : embedId) + ":"
                         + (roleId == null ? "-" : roleId), (existing == null ? "New tag: " : "Edit tag: ") + name)
-                .addComponents(Label.of("Text (you can use {user}, {user_mention}, {server}, {member_count})",
+                .addComponents(Label.of("Text",
+                        "You can use {user}, {user_mention}, {username}, {server}, {member_count}",
                         text.build())).build()).queue();
     }
 
