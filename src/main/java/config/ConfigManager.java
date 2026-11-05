@@ -23,7 +23,8 @@ public class ConfigManager {
 
             # Your bot's token (https://discord.com/developers/applications -> your app -> Bot).
             # Never share it. On that same page, turn on "Server Members Intent" under
-            # "Privileged Gateway Intents", otherwise the bot cannot start.
+            # "Privileged Gateway Intents", otherwise the bot cannot start. Also turn on
+            # "Message Content Intent" there so tags can answer to !name (optional).
             token: ''
 
             # The name shown in /help, embed footers and the console.

@@ -55,8 +55,10 @@ moderation, role panels, reaction roles, leave of absence, embeds and a welcomer
 
    Never share the token. If it leaks, reset it on the Bot page of your application.
 
-4. **Turn on the Server Members Intent.** In the developer portal: *Bot* → *Privileged Gateway Intents* →
-   *Server Members Intent*. Without it the bot refuses to start (it tells you so).
+4. **Turn on two intents.** In the developer portal: *Bot* → *Privileged Gateway Intents* → *Server Members Intent*
+   and *Message Content Intent*. Without the first the bot refuses to start (it tells you so). Without the second it
+   starts but tags only work with `/tag use`, not as `!name`. Both are free to switch on while a bot is in fewer
+   than 100 servers.
 
 5. **Invite the bot** with the `bot` and `applications.commands` scopes. A good set of permissions:
    Manage Channels, Manage Roles, View Channels, Send Messages, Embed Links, Attach Files,
@@ -264,6 +266,7 @@ Roles are stored in `data/garnet.db` and keep working after restarts.
 
 - **"Discord rejected the bot token"**: copy the token again from the Bot page into `config.yml`.
 - **Bot won't start and mentions an intent**: turn on the Server Members Intent (step 4).
+- **`!ip` doesn't answer but `/tag use ip` does**: turn on the Message Content Intent (step 4) and restart.
 - **Commands don't appear**: wait a minute, check the bot was invited with `applications.commands`, restart it.
 - **Ticket channels aren't created**: give the bot Manage Channels and Manage Roles, and make sure its role is above the
   roles you use as staff roles.
