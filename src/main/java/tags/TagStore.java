@@ -176,12 +176,16 @@ public final class TagStore {
                         "SELECT prefix FROM tag_settings WHERE guild_id = ?")) {
             statement.setString(1, guildId);
             try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? resultSet.getString(1) : null;
+                if (!resultSet.next()) {
+                    return null; // never set: the default prefix applies
+                }
+                String prefix = resultSet.getString(1);
+                return prefix == null ? "" : prefix; // an empty prefix means "off"
             }
         }
     }
 
-    /** A null prefix turns the prefix trigger off for the server. */
+    /** An empty prefix turns the prefix trigger off for the server. */
     public static void setPrefix(String guildId, String prefix) throws SQLException {
         update("INSERT INTO tag_settings (guild_id, prefix) VALUES (?, ?) "
                 + "ON CONFLICT(guild_id) DO UPDATE SET prefix = excluded.prefix", guildId, prefix);

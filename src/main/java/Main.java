@@ -97,15 +97,9 @@ public class Main {
 
         JDA jda;
         try {
-            EnumSet<GatewayIntent> intents = EnumSet.of(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS);
-            if (BotModule.TAGS.isEnabled() && ConfigManager.getBoolean("tag-prefix-commands", false)) {
-                intents.add(GatewayIntent.MESSAGE_CONTENT);
-            }
-            jda = JDABuilder.createDefault(token)
-                    .enableIntents(intents)
-                    .addEventListeners(listeners.toArray())
-                    .build()
-                    .awaitReady();
+            boolean wantMessageContent = BotModule.TAGS.isEnabled()
+                    && ConfigManager.getBoolean("tag-prefix-commands", true);
+            jda = connect(token, listeners, wantMessageContent);
         } catch (InvalidTokenException e) {
             ConsoleLogger.logConsole("Discord rejected the bot token. Check the token in config.yml "
                     + "(copy it again from the Bot tab of your application) and start the bot again.");
@@ -115,8 +109,7 @@ public class Main {
             String reason = String.valueOf(e.getMessage());
             ConsoleLogger.logConsole("Couldn't connect to Discord: " + reason.replace("\n", " "));
             if (reason.toLowerCase(java.util.Locale.ROOT).contains("intent")) {
-                ConsoleLogger.logConsole("Turn on \"Server Members Intent\" (and \"Message Content Intent\" if "
-                        + "tag-prefix-commands is true in config.yml) under Privileged Gateway Intents "
+                ConsoleLogger.logConsole("Turn on \"Server Members Intent\" under Privileged Gateway Intents "
                         + "on the Bot tab of your application at https://discord.com/developers/applications, "
                         + "then start the bot again.");
             }
@@ -150,5 +143,36 @@ public class Main {
         jda.updateCommands()
                 .addCommands(commandData)
                 .queue();
+    }
+    /**
+     * Connects to Discord. When message content is wanted (for tags such as !ip) it is requested first;
+     * if Discord refuses because the intent isn't switched on for the bot, it connects again without it
+     * and only /tag use works.
+     */
+    private static JDA connect(String token, List<ListenerAdapter> listeners, boolean messageContent)
+            throws InterruptedException {
+        EnumSet<GatewayIntent> intents = EnumSet.of(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS);
+        if (messageContent) {
+            intents.add(GatewayIntent.MESSAGE_CONTENT);
+        }
+        JDA jda = JDABuilder.createDefault(token)
+                .enableIntents(intents)
+                .addEventListeners(listeners.toArray())
+                .build();
+        try {
+            jda.awaitReady();
+        } catch (IllegalStateException e) {
+            jda.shutdownNow();
+            if (!messageContent) {
+                throw e;
+            }
+            ConsoleLogger.logConsole("Couldn't connect with the Message Content Intent, so tags can't answer to "
+                    + "!name. To enable them, turn on \"Message Content Intent\" under Privileged Gateway Intents on "
+                    + "the Bot tab of your application at https://discord.com/developers/applications and restart. "
+                    + "Trying again without it (/tag use still works).");
+            return connect(token, listeners, false);
+        }
+        tags.TagCommand.setPrefixTriggersAvailable(messageContent);
+        return jda;
     }
 }

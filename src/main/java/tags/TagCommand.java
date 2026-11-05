@@ -1,7 +1,6 @@
 package tags;
 
 import commands.Command;
-import config.ConfigManager;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.label.Label;
 import net.dv8tion.jda.api.components.textinput.TextInput;
@@ -42,6 +41,14 @@ public class TagCommand extends ListenerAdapter implements Command {
     private static final Pattern NAME = Pattern.compile("^[a-z0-9_-]{1,32}$");
     private static final String MODAL = "tag:set:";
     private static final long COOLDOWN_MS = 3000;
+    private static final String DEFAULT_PREFIX = "!";
+
+    private static volatile boolean prefixTriggersAvailable;
+
+    /** Set by Main: true when the bot connected with the Message Content Intent. */
+    public static void setPrefixTriggersAvailable(boolean available) {
+        prefixTriggersAvailable = available;
+    }
 
     /** Prefix per server, so ordinary messages don't each cost a database lookup. "" = off. */
     private final Map<String, String> prefixes = new ConcurrentHashMap<>();
@@ -69,9 +76,9 @@ public class TagCommand extends ListenerAdapter implements Command {
                         new SubcommandData("delete", "Delete a tag").addOptions(new OptionData(OptionType.STRING,
                                 "name", "The tag to delete", true).setMaxLength(32).setAutoComplete(true)),
                         new SubcommandData("list", "Show every tag in this server"),
-                        new SubcommandData("prefix", "Set the prefix that triggers tags, such as ! (needs Manage Server)")
+                        new SubcommandData("prefix", "Show or change the prefix that triggers tags (default !)")
                                 .addOption(OptionType.STRING, "prefix",
-                                        "1 to 3 characters, for example ! or ?  (leave empty to turn it off)", false));
+                                        "1 to 3 characters, for example ? or $. Type off to turn prefix triggers off", false));
     }
 
     // ---------------------------------------------------------------- slash commands
@@ -247,25 +254,49 @@ public class TagCommand extends ListenerAdapter implements Command {
 
     private void prefix(SlashCommandInteractionEvent event, Guild guild) throws SQLException {
         OptionMapping option = event.getOption("prefix");
-        String value = option == null ? "" : option.getAsString().trim();
-        if (value.isEmpty()) {
-            TagStore.setPrefix(guild.getId(), null);
+        if (option == null) {
+            String current = prefixOf(guild.getId());
+            event.reply((current.isEmpty()
+                    ? "Prefix triggers are **off** in this server. Turn them on with `/tag prefix !`."
+                    : "Members can type `" + current + "tagname` or use `/tag use tagname`.")
+                    + availabilityNote()).setEphemeral(true).queue();
+            return;
+        }
+        String value = option.getAsString().trim();
+        if (value.equalsIgnoreCase("off") || value.equalsIgnoreCase("none")) {
+            TagStore.setPrefix(guild.getId(), "");
             prefixes.put(guild.getId(), "");
             event.reply("Prefix triggers are off for this server. Tags still work with `/tag use`.")
                     .setEphemeral(true).queue();
             return;
         }
-        if (value.length() > 3 || value.chars().anyMatch(Character::isWhitespace) || value.startsWith("/")) {
-            event.reply("The prefix must be 1 to 3 characters, with no spaces, and can't start with `/`.")
-                    .setEphemeral(true).queue();
+        if (value.isEmpty() || value.length() > 3 || value.chars().anyMatch(Character::isWhitespace)
+                || value.startsWith("/")) {
+            event.reply("The prefix must be 1 to 3 characters, with no spaces, and can't start with `/`. "
+                    + "Type `off` to turn it off.").setEphemeral(true).queue();
             return;
         }
         TagStore.setPrefix(guild.getId(), value);
         prefixes.put(guild.getId(), value);
-        event.reply("✅ Members can now type `" + value + "tagname`."
-                + (prefixTriggersEnabled() ? "" : "\n⚠️ The bot's host still has to turn on "
-                        + "`tag-prefix-commands` in config.yml and enable the Message Content Intent for the "
-                        + "bot, otherwise only `/tag use` works.")).setEphemeral(true).queue();
+        event.reply("✅ Members can now type `" + value + "tagname`." + availabilityNote())
+                .setEphemeral(true).queue();
+    }
+
+    private static String availabilityNote() {
+        return prefixTriggersAvailable ? "" : "\n⚠️ This bot isn't allowed to read message text, so only `/tag use` "
+                + "works right now. Whoever runs the bot has to turn on **Message Content Intent** under "
+                + "Privileged Gateway Intents on the Bot tab of the application, then restart it.";
+    }
+
+    /** The server's prefix: its own choice, "" when turned off, or the default ! when never set. */
+    private String prefixOf(String guildId) throws SQLException {
+        String prefix = prefixes.get(guildId);
+        if (prefix == null) {
+            String stored = TagStore.getPrefix(guildId);
+            prefix = stored == null ? DEFAULT_PREFIX : stored;
+            prefixes.put(guildId, prefix);
+        }
+        return prefix;
     }
 
     @Override
@@ -299,12 +330,7 @@ public class TagCommand extends ListenerAdapter implements Command {
         }
         Guild guild = event.getGuild();
         try {
-            String prefix = prefixes.get(guild.getId());
-            if (prefix == null) {
-                String stored = TagStore.getPrefix(guild.getId());
-                prefix = stored == null ? "" : stored;
-                prefixes.put(guild.getId(), prefix);
-            }
+            String prefix = prefixOf(guild.getId());
             if (prefix.isEmpty() || !content.startsWith(prefix) || content.length() == prefix.length()) {
                 return;
             }
@@ -374,21 +400,15 @@ public class TagCommand extends ListenerAdapter implements Command {
         return builder.build();
     }
 
-    private static boolean prefixTriggersEnabled() {
-        return ConfigManager.getBoolean("tag-prefix-commands", false);
-    }
-
     private String prefixHint(Guild guild) {
-        String prefix = prefixes.get(guild.getId());
-        if (prefix == null) {
-            try {
-                String stored = TagStore.getPrefix(guild.getId());
-                prefix = stored == null ? "" : stored;
-                prefixes.put(guild.getId(), prefix);
-            } catch (SQLException exception) {
-                return "";
-            }
+        if (!prefixTriggersAvailable) {
+            return "";
         }
-        return prefix.isEmpty() || !prefixTriggersEnabled() ? "" : " or `" + prefix + "name`";
+        try {
+            String prefix = prefixOf(guild.getId());
+            return prefix.isEmpty() ? "" : " or `" + prefix + "name`";
+        } catch (SQLException exception) {
+            return "";
+        }
     }
 }
