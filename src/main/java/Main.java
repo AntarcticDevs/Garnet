@@ -36,6 +36,15 @@ public class Main {
                 System.exit(1);
                 return;
             }
+            try {
+                List<String> added = ConfigManager.addMissingSettings();
+                if (!added.isEmpty()) {
+                    ConsoleLogger.logConsole("config.yml: added new settings (" + String.join(", ", added)
+                            + "). Your old file was kept as config.yml.bak.");
+                }
+            } catch (IOException e) {
+                Log.warn("Couldn't add new settings to config.yml; carrying on with the file as it is.", e);
+            }
         } catch (IOException e) {
             ConsoleLogger.logConsole("Couldn't read config.yml: " + e.getMessage());
             System.exit(1);
