@@ -122,6 +122,11 @@ help-thumbnail-url: ''    # blank = the bot's avatar
 Stop the bot, replace the jar, start it again. New versions add database columns and tables on startup
 and never remove existing data, so panels, tickets, embeds and reaction roles carry over.
 
+Your `config.yml` is never replaced. When a new version adds settings or features, the bot adds the missing
+lines (with their comments) to your existing file on startup and tells you in the console. It only adds lines:
+nothing you wrote is changed, your token is never touched, and the previous file is kept as `config.yml.bak`.
+Settings you leave out simply use their defaults, so a missing feature stays on.
+
 A bot from an older version that has `garnet.db` next to the jar keeps using that file. To move it into the
 data folder, stop the bot, move the file to `data/garnet.db` and start it again (or set `database-path`).
 

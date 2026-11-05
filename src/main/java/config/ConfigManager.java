@@ -15,7 +15,7 @@ import java.util.Set;
 
 public class ConfigManager {
     private static final Path CONFIG_PATH = Path.of("config.yml");
-    private static final String DEFAULT_CONFIG = """
+    static final String DEFAULT_CONFIG = """
             # -----------------------------------------------------------------------------
             # Bot configuration. Edit this file, save it, then start the bot again.
             # Tip: keep values inside quotes, for example  token: 'your-token-here'
@@ -65,6 +65,15 @@ public class ConfigManager {
             """;
 
     private static Map<String, Object> config = Map.of();
+
+    /** Adds settings introduced by newer versions to an existing config.yml (never changes existing lines). */
+    public static java.util.List<String> addMissingSettings() throws IOException {
+        return ConfigUpgrader.run();
+    }
+
+    static Path configPath() {
+        return CONFIG_PATH;
+    }
 
     /** Writes a commented default config.yml when none exists. Returns true if it was just created. */
     public static boolean createIfMissing() throws IOException {
@@ -150,6 +159,11 @@ public class ConfigManager {
     /** True when the setting exists and is a section ({@code name:} followed by indented settings). */
     public static boolean isSection(String path) {
         return find(path) instanceof Map<?, ?>;
+    }
+
+    /** True when a top-level setting of that name exists in config.yml, even if its value is blank. */
+    static boolean hasKey(String key) {
+        return config.containsKey(key);
     }
 
     private static Boolean parseBoolean(String text) {
