@@ -120,7 +120,8 @@ public class Help extends ListenerAdapter implements Command {
                     """
                     Members type the prefix and the tag name (for example `!ip`) or use `/tag use name`.
                     `/tag list` Shows every tag in this server.
-                    `/tag set name [embed] [required-role]` Creates or edits a tag: a form asks for the text.
+                    `/tag create name [embed] [required-role]` Creates a tag: a form asks for the text.
+                    `/tag edit name [embed] [required-role]` Changes a tag (also `no-embed`, `no-role`).
                     `/tag delete name` Removes a tag. `/tag prefix [prefix|off]` Shows or changes the prefix (default `!`).
                     *Managing tags needs Manage Server.* Text placeholders: `{user}` `{user_mention}` `{server}` `{member_count}`."""),
             new Page(BotModule.LOGGING, "logging", "📜", "Logging",

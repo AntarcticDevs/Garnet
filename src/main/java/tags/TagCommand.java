@@ -56,16 +56,24 @@ public class TagCommand extends ListenerAdapter implements Command {
 
     @Override
     public CommandData getCommandData() {
-        OptionData name = new OptionData(OptionType.STRING, "name", "The tag's name", true)
-                .setMaxLength(32).setAutoComplete(true);
+        OptionData embed = new OptionData(OptionType.STRING, "embed",
+                "A saved embed to send with it (from /embed create)", false).setAutoComplete(true);
+        OptionData role = new OptionData(OptionType.ROLE, "required-role",
+                "Only members with this role can use the tag", false);
         return Commands.slash("tag", "Custom commands that reply with a message or embed")
                 .addSubcommands(
                         new SubcommandData("use", "Show a tag").addOptions(new OptionData(OptionType.STRING, "name",
                                 "The tag to show", true).setMaxLength(32).setAutoComplete(true)),
-                        new SubcommandData("set", "Create a tag or change an existing one")
-                                .addOptions(name,
+                        new SubcommandData("create", "Create a new tag (a form asks for the text)")
+                                .addOptions(new OptionData(OptionType.STRING, "name",
+                                                "A new name: lowercase letters, numbers, - and _", true)
+                                                .setMaxLength(32),
+                                        embed, role),
+                        new SubcommandData("edit", "Change an existing tag")
+                                .addOptions(new OptionData(OptionType.STRING, "name", "The tag to edit", true)
+                                                .setMaxLength(32).setAutoComplete(true),
                                         new OptionData(OptionType.STRING, "embed",
-                                                "A saved embed to send with it (from /embed create)", false)
+                                                "A different saved embed to send with it", false)
                                                 .setAutoComplete(true),
                                         new OptionData(OptionType.ROLE, "required-role",
                                                 "Only members with this role can use the tag", false),
@@ -106,7 +114,8 @@ public class TagCommand extends ListenerAdapter implements Command {
                         return;
                     }
                     switch (sub) {
-                        case "set" -> set(event, guild);
+                        case "create" -> set(event, guild, true);
+                        case "edit" -> set(event, guild, false);
                         case "delete" -> delete(event, guild);
                         case "prefix" -> prefix(event, guild);
                         default -> event.reply("Unknown subcommand.").setEphemeral(true).queue();
@@ -135,7 +144,7 @@ public class TagCommand extends ListenerAdapter implements Command {
         event.reply(message).queue();
     }
 
-    private void set(SlashCommandInteractionEvent event, Guild guild) throws SQLException {
+    private void set(SlashCommandInteractionEvent event, Guild guild, boolean creating) throws SQLException {
         String name = event.getOption("name").getAsString().trim().toLowerCase(Locale.ROOT);
         if (!NAME.matcher(name).matches()) {
             event.reply("Tag names can use lowercase letters, numbers, `-` and `_` (up to 32 characters).")
@@ -143,6 +152,16 @@ public class TagCommand extends ListenerAdapter implements Command {
             return;
         }
         TagStore.Tag existing = TagStore.get(guild.getId(), name);
+        if (creating && existing != null) {
+            event.reply("There is already a tag called **" + name + "**. Change it with `/tag edit " + name + "`.")
+                    .setEphemeral(true).queue();
+            return;
+        }
+        if (!creating && existing == null) {
+            event.reply("There is no tag called **" + name + "**. Create it with `/tag create " + name + "`.")
+                    .setEphemeral(true).queue();
+            return;
+        }
         if (existing == null && TagStore.count(guild.getId()) >= TagStore.MAX_TAGS) {
             event.reply("A server can have at most " + TagStore.MAX_TAGS + " tags.").setEphemeral(true).queue();
             return;
@@ -195,7 +214,7 @@ public class TagCommand extends ListenerAdapter implements Command {
         }
         String[] parts = event.getModalId().substring(MODAL.length()).split(":");
         if (parts.length != 3) {
-            event.reply("That form is no longer valid. Run `/tag set` again.").setEphemeral(true).queue();
+            event.reply("That form is no longer valid. Run `/tag create` or `/tag edit` again.").setEphemeral(true).queue();
             return;
         }
         try {
@@ -234,7 +253,7 @@ public class TagCommand extends ListenerAdapter implements Command {
     private void list(SlashCommandInteractionEvent event, Guild guild) throws SQLException {
         List<TagStore.Tag> tags = TagStore.list(guild.getId());
         if (tags.isEmpty()) {
-            event.reply("There are no tags yet. Admins can create one with `/tag set`.").setEphemeral(true).queue();
+            event.reply("There are no tags yet. Admins can create one with `/tag create`.").setEphemeral(true).queue();
             return;
         }
         StringBuilder text = new StringBuilder("**Tags** (" + tags.size() + ")\n");
@@ -313,6 +332,7 @@ public class TagCommand extends ListenerAdapter implements Command {
             event.replyChoiceStrings(names).queue();
         } catch (SQLException exception) {
             Log.error("TagCommand autocomplete failed", exception);
+            event.replyChoices(List.of()).queue();
         }
     }
 
