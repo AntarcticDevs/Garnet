@@ -227,8 +227,8 @@ filled in each time someone joins.
 
 ## Tags
 
-Tags are custom commands that reply with text, a saved embed, or both. Create one with `/tag set name`: a form
-asks for the text, and you can attach an embed from `/embed create` and limit the tag to a role. Managing tags needs
+Tags are custom commands that reply with text, a saved embed, or both. Create one with `/tag create name`: a form
+asks for the text, and you can attach an embed from `/embed create` and limit the tag to a role. Change one with `/tag edit name`. Managing tags needs
 Manage Server; anyone can use `/tag use name` and `/tag list`. Names use lowercase letters, numbers, `-` and `_`.
 
 Text can use `{user}`, `{user_mention}`, `{username}`, `{server}` and `{member_count}`. Mentions inside a tag never
