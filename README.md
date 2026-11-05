@@ -232,13 +232,14 @@ Manage Server; anyone can use `/tag use name` and `/tag list`. Names use lowerca
 Text can use `{user}`, `{user_mention}`, `{username}`, `{server}` and `{member_count}`. Mentions inside a tag never
 ping anyone. If you delete a saved embed, tags that used it keep their text.
 
-**Typing `!ip` instead of `/tag use ip`** needs two things from the host, because Discord treats reading message
-text as a privileged feature:
-1. Turn on **Message Content Intent** under Privileged Gateway Intents on the Bot tab of your application.
-2. Set `tag-prefix-commands: true` in `config.yml` and restart.
+**Using a tag:** members type the prefix and the name, such as `!ip`, or run `/tag use ip`. The default prefix is
+`!`; change it per server with `/tag prefix ?`, turn it off with `/tag prefix off`, and run `/tag prefix` on its
+own to see the current one.
 
-Then run `/tag prefix !` (or any 1 to 3 character prefix) in each server that should use it. Leave
-`tag-prefix-commands` as `false` if you only want slash commands, and the bot never asks for message text.
+**One thing the person running the bot must do:** Discord treats reading message text as a privileged feature, so
+turn on **Message Content Intent** under Privileged Gateway Intents on the Bot tab of your application (next to
+Server Members Intent). If it is off the bot still starts, prints a message in the console and falls back to
+`/tag use` only. Set `tag-prefix-commands: false` in `config.yml` if you never want the bot to ask for it.
 
 ## Reaction roles
 

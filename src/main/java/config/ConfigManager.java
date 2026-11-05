@@ -49,10 +49,11 @@ public class ConfigManager {
               tags: true          # /tag: custom commands such as !ip that reply with a message or embed
               logging: true       # /logs: a log channel for tickets, members, moderation and more
 
-            # Let tags answer to a prefix such as !ip (set per server with /tag prefix). This needs the
-            # "Message Content Intent": turn it on under "Privileged Gateway Intents" on the Bot tab of
-            # your application first, or the bot will not start. Leave false to use only /tag use.
-            tag-prefix-commands: false
+            # Let members trigger tags by typing a prefix and the tag name, such as !ip (each server can
+            # change the prefix with /tag prefix). This needs the "Message Content Intent": turn it on under
+            # "Privileged Gateway Intents" on the Bot tab of your application. If it is off the bot still
+            # starts, but only /tag use works. Set to false to never ask for it.
+            tag-prefix-commands: true
 
             # Optional links shown as buttons in /help. Leave a link blank to hide its button.
             support-url: ''
