@@ -17,6 +17,7 @@ moderation, role panels, reaction roles, leave of absence, embeds and a welcomer
 | **Reaction roles** | Choose emoji-reaction or button-style role assignment with `/reaction-roles`; mappings survive restarts |
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Leave of absence** | `/loa`: members request leave, staff approve or deny with buttons, the LOA role is added and removed automatically |
+| **Tags** | `/tag`: custom commands such as `!ip` that reply with a message or a saved embed |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
 | **Activity** | Admin-only `/activity`; activity settings, presets, rotation, schedules and member milestones are stored in `data/activity.json` |
@@ -91,6 +92,7 @@ modules:                  # true = on, false = off
   reaction-roles: true
   tickets: true
   welcomer: true
+  tags: true
   loa: true
   embeds: true
   logging: true
@@ -215,6 +217,23 @@ Greets new members with one of your saved embeds (build it with `/embed create`)
 Placeholders you can use in the embed's text and image links: `{user}` (name), `{user_mention}`, `{server}`,
 `{member_count}`, `{member_count_ordinal}` (1st, 2nd, 3rd...), `{server_icon}` and `{member_avatar}`. They are
 filled in each time someone joins.
+
+## Tags
+
+Tags are custom commands that reply with text, a saved embed, or both. Create one with `/tag set name`: a form
+asks for the text, and you can attach an embed from `/embed create` and limit the tag to a role. Managing tags needs
+Manage Server; anyone can use `/tag use name` and `/tag list`. Names use lowercase letters, numbers, `-` and `_`.
+
+Text can use `{user}`, `{user_mention}`, `{username}`, `{server}` and `{member_count}`. Mentions inside a tag never
+ping anyone. If you delete a saved embed, tags that used it keep their text.
+
+**Typing `!ip` instead of `/tag use ip`** needs two things from the host, because Discord treats reading message
+text as a privileged feature:
+1. Turn on **Message Content Intent** under Privileged Gateway Intents on the Bot tab of your application.
+2. Set `tag-prefix-commands: true` in `config.yml` and restart.
+
+Then run `/tag prefix !` (or any 1 to 3 character prefix) in each server that should use it. Leave
+`tag-prefix-commands` as `false` if you only want slash commands, and the bot never asks for message text.
 
 ## Reaction roles
 
