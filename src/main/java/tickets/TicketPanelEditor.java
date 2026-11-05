@@ -581,7 +581,8 @@ public class TicketPanelEditor extends ListenerAdapter {
                                     "0 to 50", false)))
                     .build()).queue();
             case "welcome" -> event.replyModal(Modal.create(id(panel, page, "welcome"), "Welcome message")
-                    .addComponents(Label.of("Message ({user} {username} {category} {panel})",
+                    .addComponents(Label.of("Welcome message",
+                            "You can use {user}, {username}, {category} and {panel}",
                             input("welcome", TextInputStyle.PARAGRAPH, 2000, panel.welcomeMessage,
                                     "Hi {user}! A staff member will be with you soon.", false)))
                     .build()).queue();
