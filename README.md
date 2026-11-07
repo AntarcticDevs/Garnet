@@ -18,6 +18,8 @@ moderation, role panels, reaction roles, leave of absence, embeds and a welcomer
 | **Embeds** | `/embed` builder, saved embeds, `/rules` |
 | **Leave of absence** | `/loa`: members request leave, staff approve or deny with buttons, the LOA role is added and removed automatically |
 | **Tags** | `/tag`: custom commands such as `!ip` that reply with a message or a saved embed |
+| **Counting** | `/counting`: a channel where members count upward together, with a high score and leaderboard |
+| **Auto-reactions** | `/autoreact`: the bot reacts to messages with emoji you choose, in all or some channels |
 | **Welcomer** | Welcome message for new members using a saved embed |
 | **Information** | `/ping`, `/info`, `/userinfo`, `/avatar` |
 | **Activity** | Admin-only `/activity`; activity settings, presets, rotation, schedules and member milestones are stored in `data/activity.json` |
@@ -57,7 +59,7 @@ moderation, role panels, reaction roles, leave of absence, embeds and a welcomer
 
 4. **Turn on two intents.** In the developer portal: *Bot* → *Privileged Gateway Intents* → *Server Members Intent*
    and *Message Content Intent*. Without the first the bot refuses to start (it tells you so). Without the second it
-   starts but tags only work with `/tag use`, not as `!name`. Both are free to switch on while a bot is in fewer
+   starts but tags only work with `/tag use`, not as `!name`, and counting and keyword, image and link auto-reactions can't see messages. Both are free to switch on while a bot is in fewer
    than 100 servers.
 
 5. **Invite the bot** with the `bot` and `applications.commands` scopes. A good set of permissions:
@@ -95,6 +97,8 @@ modules:                  # true = on, false = off
   tickets: true
   welcomer: true
   tags: true
+  counting: true
+  auto-react: true
   loa: true
   embeds: true
   logging: true
@@ -242,6 +246,19 @@ own to see the current one.
 turn on **Message Content Intent** under Privileged Gateway Intents on the Bot tab of your application (next to
 Server Members Intent). If it is off the bot still starts, prints a message in the console and falls back to
 `/tag use` only. Set `tag-prefix-commands: false` in `config.yml` if you never want the bot to ask for it.
+
+## Counting and auto-reactions
+
+**Counting.** `/counting setup #channel` starts a game. Members post the next number alone in a message; the bot reacts
+✅ when it is right. A wrong number, or the same person twice in a row, gets ❌ and (by default) the count starts again
+from 1; use `reset-on-mistake: false` to delete the message and carry on instead. `/counting status`,
+`/counting leaderboard`, `/counting reset`, `/counting set-number` and `/counting disable` are there too. Edited or
+deleted numbers aren't tracked. It needs **Message Content Intent**.
+
+**Auto-reactions.** `/autoreact add emojis:👍 👎` makes the bot react to every message in the server; add `channel`,
+or `when` (image, link or word) to narrow it. `/autoreact list` and `/autoreact remove id` manage the rules (up to 25).
+Rules for every message work without Message Content Intent; the image, link and word rules need it. Turn the modules
+off in `config.yml` (`counting: false`, `auto-react: false`) if you don't want the bot to ask for that intent.
 
 ## Reaction roles
 

@@ -97,8 +97,9 @@ public class Main {
 
         JDA jda;
         try {
-            boolean wantMessageContent = BotModule.TAGS.isEnabled()
-                    && ConfigManager.getBoolean("tag-prefix-commands", true);
+            boolean wantMessageContent = (BotModule.TAGS.isEnabled()
+                    && ConfigManager.getBoolean("tag-prefix-commands", true))
+                    || BotModule.COUNTING.isEnabled() || BotModule.AUTO_REACT.isEnabled();
             jda = connect(token, listeners, wantMessageContent);
         } catch (InvalidTokenException e) {
             ConsoleLogger.logConsole("Discord rejected the bot token. Check the token in config.yml "
@@ -167,12 +168,13 @@ public class Main {
                 throw e;
             }
             ConsoleLogger.logConsole("Couldn't connect with the Message Content Intent, so tags can't answer to "
-                    + "!name. To enable them, turn on \"Message Content Intent\" under Privileged Gateway Intents on "
+                    + "!name and counting / keyword auto-reactions can't read messages. To enable them, turn on \"Message Content Intent\" under Privileged Gateway Intents on "
                     + "the Bot tab of your application at https://discord.com/developers/applications and restart. "
                     + "Trying again without it (/tag use still works).");
             return connect(token, listeners, false);
         }
         tags.TagCommand.setPrefixTriggersAvailable(messageContent);
+        utils.MessageContent.setAvailable(messageContent);
         return jda;
     }
 }
