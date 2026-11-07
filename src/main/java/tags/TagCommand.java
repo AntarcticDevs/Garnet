@@ -151,19 +151,12 @@ public class TagCommand extends ListenerAdapter implements Command {
                     .setEphemeral(true).queue();
             return;
         }
-        TagStore.Tag existing = TagStore.get(guild.getId(), name);
-        if (creating && existing != null) {
-            event.reply("There is already a tag called **" + name + "**. Change it with `/tag edit " + name + "`.")
-                    .setEphemeral(true).queue();
-            return;
-        }
+        // Creating opens the form without touching the database, so Discord's 3-second limit is never at risk on a
+        // slow host; the "already exists" and limit checks happen when the form is submitted.
+        TagStore.Tag existing = creating ? null : TagStore.get(guild.getId(), name);
         if (!creating && existing == null) {
             event.reply("There is no tag called **" + name + "**. Create it with `/tag create " + name + "`.")
                     .setEphemeral(true).queue();
-            return;
-        }
-        if (existing == null && TagStore.count(guild.getId()) >= TagStore.MAX_TAGS) {
-            event.reply("A server can have at most " + TagStore.MAX_TAGS + " tags.").setEphemeral(true).queue();
             return;
         }
 
@@ -196,7 +189,8 @@ public class TagCommand extends ListenerAdapter implements Command {
             text.setValue(existing.content);
         }
         event.replyModal(Modal.create(MODAL + name + ":" + (embedId == null ? "-" : embedId) + ":"
-                        + (roleId == null ? "-" : roleId), (existing == null ? "New tag: " : "Edit tag: ") + name)
+                        + (roleId == null ? "-" : roleId) + ":" + (creating ? "c" : "e"),
+                        (creating ? "New tag: " : "Edit tag: ") + name)
                 .addComponents(Label.of("Text",
                         "You can use {user}, {user_mention}, {username}, {server}, {member_count}",
                         text.build())).build()).queue();
@@ -214,7 +208,7 @@ public class TagCommand extends ListenerAdapter implements Command {
             return;
         }
         String[] parts = event.getModalId().substring(MODAL.length()).split(":");
-        if (parts.length != 3) {
+        if (parts.length != 3 && parts.length != 4) {
             event.reply("That form is no longer valid. Run `/tag create` or `/tag edit` again.").setEphemeral(true).queue();
             return;
         }
@@ -231,6 +225,11 @@ public class TagCommand extends ListenerAdapter implements Command {
                 return;
             }
             boolean existed = TagStore.get(guild.getId(), tag.name) != null;
+            if (existed && parts.length == 4 && parts[3].equals("c")) {
+                event.reply("There is already a tag called **" + tag.name + "**. Change it with `/tag edit "
+                        + tag.name + "`.").setEphemeral(true).queue();
+                return;
+            }
             if (!existed && TagStore.count(guild.getId()) >= TagStore.MAX_TAGS) {
                 event.reply("A server can have at most " + TagStore.MAX_TAGS + " tags.").setEphemeral(true).queue();
                 return;
