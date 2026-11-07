@@ -70,7 +70,7 @@ public class ConfigManager {
 
     private static Map<String, Object> config = Map.of();
 
-    /** Adds settings introduced by newer versions to an existing config.yml (never changes existing lines). */
+
     public static java.util.List<String> addMissingSettings() throws IOException {
         return ConfigUpgrader.run();
     }
@@ -79,7 +79,7 @@ public class ConfigManager {
         return CONFIG_PATH;
     }
 
-    /** Writes a commented default config.yml when none exists. Returns true if it was just created. */
+
     public static boolean createIfMissing() throws IOException {
         if (Files.exists(CONFIG_PATH)) {
             return false;
@@ -89,10 +89,10 @@ public class ConfigManager {
         return true;
     }
 
-    /**
-     * Reads config.yml. An empty file is treated as "no settings"; a file that is not valid YAML or
-     * is not a list of {@code key: value} settings is reported with a readable message.
-     */
+
+
+
+
     public static void load() throws IOException {
         Object loaded;
         try (InputStream input = Files.newInputStream(CONFIG_PATH)) {
@@ -116,10 +116,10 @@ public class ConfigManager {
         config = values;
     }
 
-    /**
-     * The setting as trimmed text, or null when it is missing or blank. Numbers and booleans are
-     * converted, so an ID written without quotes ({@code channel: 123456789012345678}) still works.
-     */
+
+
+
+
     public static String getString(String key) {
         Object value = find(key);
         if (value == null) {
@@ -134,7 +134,7 @@ public class ConfigManager {
         return botName == null ? "Bot" : botName;
     }
 
-    /** The setting as a boolean; accepts true/false/yes/no/on/off (quoted or not). Missing or unreadable gives the fallback. */
+
     public static boolean getBoolean(String key, boolean fallback) {
         String text = getString(key);
         if (text == null) {
@@ -144,12 +144,12 @@ public class ConfigManager {
         return value == null ? fallback : value;
     }
 
-    /** True when the text is something {@link #getBoolean} understands (true/false/yes/no/on/off). */
+
     public static boolean looksLikeBoolean(String text) {
         return text != null && parseBoolean(text.trim()) != null;
     }
 
-    /** The names of the settings nested under a section such as {@code modules}; empty if it isn't a section. */
+
     public static Set<String> keysUnder(String path) {
         Set<String> keys = new LinkedHashSet<>();
         if (find(path) instanceof Map<?, ?> section) {
@@ -160,12 +160,12 @@ public class ConfigManager {
         return keys;
     }
 
-    /** True when the setting exists and is a section ({@code name:} followed by indented settings). */
+
     public static boolean isSection(String path) {
         return find(path) instanceof Map<?, ?>;
     }
 
-    /** True when a top-level setting of that name exists in config.yml, even if its value is blank. */
+
     static boolean hasKey(String key) {
         return config.containsKey(key);
     }
@@ -178,7 +178,7 @@ public class ConfigManager {
         };
     }
 
-    /** Looks a setting up by name, or by dotted path for nested settings such as {@code modules.tickets}. */
+
     private static Object find(String path) {
         if (config.containsKey(path)) {
             return config.get(path);

@@ -29,13 +29,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
-/** /counting: a channel where members count upward together, one number per message. */
+
 public class CountingCommand extends ListenerAdapter implements Command {
     private static final Pattern NUMBER = Pattern.compile("^\\d{1,9}$");
     private static final int MILESTONE = 100;
     private static final Object NO_GAME = new Object();
 
-    /** One thread handles every count, so numbers are judged in order and the database stays off the gateway thread. */
+
     private final ExecutorService worker = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "garnet-counting");
         thread.setDaemon(true);
@@ -64,7 +64,7 @@ public class CountingCommand extends ListenerAdapter implements Command {
                         new SubcommandData("disable", "Turn counting off in this server (Manage Server)"));
     }
 
-    // ---------------------------------------------------------------- slash command
+
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
@@ -155,7 +155,7 @@ public class CountingCommand extends ListenerAdapter implements Command {
         event.reply(text.toString()).setAllowedMentions(EnumSet.noneOf(Message.MentionType.class)).queue();
     }
 
-    // ---------------------------------------------------------------- counting
+
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {

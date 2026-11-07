@@ -10,7 +10,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Saves custom command tags and each server's tag prefix. */
+
 public final class TagStore {
     public static final int MAX_TAGS = 200;
 
@@ -53,7 +53,7 @@ public final class TagStore {
         }
     }
 
-    // ---------------------------------------------------------------- tags
+
 
     public static Tag get(String guildId, String name) throws SQLException {
         try (Connection connection = Database.getConnection();
@@ -90,7 +90,7 @@ public final class TagStore {
         }
     }
 
-    /** Creates the tag or replaces its content, embed and required role (the use count is kept). */
+
     public static void save(Tag tag, String createdBy) throws SQLException {
         try (Connection connection = Database.getConnection();
                 PreparedStatement statement = connection.prepareStatement("""
@@ -149,7 +149,7 @@ public final class TagStore {
                 guildId, like(typed), limit);
     }
 
-    // ---------------------------------------------------------------- saved embeds
+
 
     public static Long embedIdByName(String guildId, String name) throws SQLException {
         try (Connection connection = Database.getConnection();
@@ -168,7 +168,7 @@ public final class TagStore {
                 guildId, like(typed), limit);
     }
 
-    // ---------------------------------------------------------------- prefix
+
 
     public static String getPrefix(String guildId) throws SQLException {
         try (Connection connection = Database.getConnection();
@@ -177,21 +177,21 @@ public final class TagStore {
             statement.setString(1, guildId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
-                    return null; // never set: the default prefix applies
+                    return null;
                 }
                 String prefix = resultSet.getString(1);
-                return prefix == null ? "" : prefix; // an empty prefix means "off"
+                return prefix == null ? "" : prefix;
             }
         }
     }
 
-    /** An empty prefix turns the prefix trigger off for the server. */
+
     public static void setPrefix(String guildId, String prefix) throws SQLException {
         update("INSERT INTO tag_settings (guild_id, prefix) VALUES (?, ?) "
                 + "ON CONFLICT(guild_id) DO UPDATE SET prefix = excluded.prefix", guildId, prefix);
     }
 
-    // ---------------------------------------------------------------- helpers
+
 
     private static String like(String typed) {
         String text = typed == null ? "" : typed.toLowerCase();

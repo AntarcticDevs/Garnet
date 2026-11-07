@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** Saves auto-reaction rules. */
+
 public final class AutoReactStore {
     public static final int MAX_RULES = 25;
 

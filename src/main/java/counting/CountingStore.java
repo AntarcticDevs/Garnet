@@ -10,7 +10,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Saves the counting game: one channel per server, the current number and per-member stats. */
+
 public final class CountingStore {
     private CountingStore() {
     }
@@ -75,7 +75,7 @@ public final class CountingStore {
         }
     }
 
-    /** Sets the channel and options. The count and high score are kept when the channel stays the same. */
+
     public static void configure(String guildId, String channelId, boolean resetOnMistake, boolean allowDouble)
             throws SQLException {
         Settings old = get(guildId);

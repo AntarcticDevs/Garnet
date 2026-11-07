@@ -30,13 +30,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-/** /autoreact: the bot reacts with emoji to messages that match a rule. */
+
 public class AutoReactCommand extends ListenerAdapter implements Command {
     private static final Pattern LINK = Pattern.compile("https?://\\S+", Pattern.CASE_INSENSITIVE);
     private static final int MAX_EMOJIS_PER_RULE = 5;
     private static final int MAX_REACTIONS_PER_MESSAGE = 20;
 
-    /** Rules per server, so ordinary messages don't each cost a database lookup. */
+
     private final Map<String, List<AutoReactStore.Rule>> cache = new ConcurrentHashMap<>();
 
     @Override
@@ -69,7 +69,7 @@ public class AutoReactCommand extends ListenerAdapter implements Command {
                                         true).setMinValue(1)));
     }
 
-    // ---------------------------------------------------------------- slash command
+
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
@@ -180,7 +180,7 @@ public class AutoReactCommand extends ListenerAdapter implements Command {
                 + (rule.includeBots ? " (bots included)" : "");
     }
 
-    // ---------------------------------------------------------------- reacting
+
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
@@ -233,7 +233,7 @@ public class AutoReactCommand extends ListenerAdapter implements Command {
         };
     }
 
-    /** One reaction after the other, in the order of the rule; a failed one doesn't stop the rest. */
+
     private static void react(Message message, List<Emoji> emojis, int index) {
         if (index >= emojis.size() || index >= MAX_REACTIONS_PER_MESSAGE) {
             return;

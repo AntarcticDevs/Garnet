@@ -36,7 +36,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-/** /tag: custom commands that answer with a message or a saved embed, also usable as !name. */
+
 public class TagCommand extends ListenerAdapter implements Command {
     private static final Pattern NAME = Pattern.compile("^[a-z0-9_-]{1,32}$");
     private static final String MODAL = "tag:set:";
@@ -45,12 +45,12 @@ public class TagCommand extends ListenerAdapter implements Command {
 
     private static volatile boolean prefixTriggersAvailable;
 
-    /** Set by Main: true when the bot connected with the Message Content Intent. */
+
     public static void setPrefixTriggersAvailable(boolean available) {
         prefixTriggersAvailable = available;
     }
 
-    /** Prefix per server, so ordinary messages don't each cost a database lookup. "" = off. */
+
     private final Map<String, String> prefixes = new ConcurrentHashMap<>();
     private final Map<String, Long> lastUse = new ConcurrentHashMap<>();
 
@@ -89,7 +89,7 @@ public class TagCommand extends ListenerAdapter implements Command {
                                         "1 to 3 characters, for example ? or $. Type off to turn prefix triggers off", false));
     }
 
-    // ---------------------------------------------------------------- slash commands
+
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
@@ -308,7 +308,7 @@ public class TagCommand extends ListenerAdapter implements Command {
                 + "Privileged Gateway Intents on the Bot tab of the application, then restart it.";
     }
 
-    /** The server's prefix: its own choice, "" when turned off, or the default ! when never set. */
+
     private String prefixOf(String guildId) throws SQLException {
         String prefix = prefixes.get(guildId);
         if (prefix == null) {
@@ -337,7 +337,7 @@ public class TagCommand extends ListenerAdapter implements Command {
         }
     }
 
-    // ---------------------------------------------------------------- prefix trigger (!name)
+
 
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
@@ -386,7 +386,7 @@ public class TagCommand extends ListenerAdapter implements Command {
         }
     }
 
-    // ---------------------------------------------------------------- helpers
+
 
     private static boolean mayUse(Member member, TagStore.Tag tag) {
         if (tag.requiredRoleId == null || member.hasPermission(Permission.MANAGE_SERVER)) {

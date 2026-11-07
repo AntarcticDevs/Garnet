@@ -145,11 +145,11 @@ public class Main {
                 .addCommands(commandData)
                 .queue();
     }
-    /**
-     * Connects to Discord. When message content is wanted (for tags such as !ip) it is requested first;
-     * if Discord refuses because the intent isn't switched on for the bot, it connects again without it
-     * and only /tag use works.
-     */
+
+
+
+
+
     private static JDA connect(String token, List<ListenerAdapter> listeners, boolean messageContent)
             throws InterruptedException {
         EnumSet<GatewayIntent> intents = EnumSet.of(GatewayIntent.GUILD_MEMBERS, GatewayIntent.GUILD_MESSAGE_REACTIONS);

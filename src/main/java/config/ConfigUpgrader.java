@@ -14,11 +14,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Adds settings that a newer version introduced to an existing config.yml. It only ever adds lines:
- * nothing the host wrote is changed or removed, the token is never touched, and the old file is kept
- * as config.yml.bak. If the result isn't valid YAML the original is put back.
- */
+
+
+
+
+
 final class ConfigUpgrader {
     private static final Pattern TOP_KEY = Pattern.compile("^([A-Za-z0-9_-]+):.*$");
     private static final Pattern MODULE_LINE = Pattern.compile("^ {2}([A-Za-z0-9_-]+):.*$");
@@ -27,11 +27,11 @@ final class ConfigUpgrader {
     private ConfigUpgrader() {
     }
 
-    /** The result of a text upgrade: the new text and a description of every addition. */
+
     record Result(String text, List<String> added, List<String> notes) {
     }
 
-    /** Adds the missing settings to config.yml and reloads it. Returns what was added (empty if nothing). */
+
     static List<String> run() throws IOException {
         Path path = ConfigManager.configPath();
         String original = Files.readString(path);
@@ -67,7 +67,7 @@ final class ConfigUpgrader {
         return report;
     }
 
-    /** Pure text step, kept separate so it can be tested without touching any file. */
+
     static Result upgradeText(String original, String template, Set<String> topPresent, Set<String> modulesPresent,
             boolean modulesIsSection) {
         String eol = original.contains("\r\n") ? "\r\n" : "\n";
@@ -79,7 +79,7 @@ final class ConfigUpgrader {
         List<String> notes = new ArrayList<>();
         List<String> templateLines = List.of(template.split("\n", -1));
 
-        // modules: insert missing entries inside the host's existing modules block.
+
         int modulesIndex = indexOfKey(lines, "modules");
         List<String> missingModules = new ArrayList<>();
         for (String line : templateLines) {
@@ -109,7 +109,7 @@ final class ConfigUpgrader {
             }
         }
 
-        // top-level settings: append the missing ones, with their comments, at the end.
+
         List<String> append = new ArrayList<>();
         boolean modulesBlockNeeded = modulesIndex < 0;
         for (int index = 0; index < templateLines.size(); index++) {
