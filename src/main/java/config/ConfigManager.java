@@ -48,6 +48,8 @@ public class ConfigManager {
               embeds: true        # /embed and /rules
               loa: true           # /loa: leave of absence requests with staff review
               tags: true          # /tag: custom commands such as !ip that reply with a message or embed
+              counting: true      # /counting: a counting game (needs Message Content Intent)
+              auto-react: true    # /autoreact: the bot adds reactions to messages automatically
               logging: true       # /logs: a log channel for tickets, members, moderation and more
 
             # Let members trigger tags by typing a prefix and the tag name, such as !ip (each server can

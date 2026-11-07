@@ -13,6 +13,8 @@ import commands.ReactionRoles;
 import commands.Rules;
 import commands.Ticket;
 import commands.UserInfo;
+import autoreact.AutoReactCommand;
+import counting.CountingCommand;
 import config.ConfigManager;
 import events.WelcomeListener;
 import loa.LoaCommand;
@@ -59,6 +61,10 @@ public enum BotModule {
             }),
     TAGS("tags", "/tag: custom commands that answer with a message or embed",
             () -> List.<ListenerAdapter>of(new TagCommand())),
+    COUNTING("counting", "/counting: a counting game channel (needs Message Content Intent)",
+            () -> List.<ListenerAdapter>of(new CountingCommand())),
+    AUTO_REACT("auto-react", "/autoreact: reactions added automatically to messages",
+            () -> List.<ListenerAdapter>of(new AutoReactCommand())),
     LOGGING("logging", "/logs and the server and ticket log channel",
             () -> List.<ListenerAdapter>of(new LogCommand(), new ServerLogListener()));
 

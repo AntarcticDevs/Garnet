@@ -124,6 +124,19 @@ public class Help extends ListenerAdapter implements Command {
                     `/tag edit name [embed] [required-role]` Changes a tag (also `no-embed`, `no-role`).
                     `/tag delete name` Removes a tag. `/tag prefix [prefix|off]` Shows or changes the prefix (default `!`).
                     *Managing tags needs Manage Server.* Text placeholders: `{user}` `{user_mention}` `{server}` `{member_count}`."""),
+            new Page(BotModule.COUNTING, "counting", "🔢", "Counting",
+                    "A channel where everyone counts upward together",
+                    """
+                    Type the next number in the counting channel. Right: ✅. Wrong or twice in a row: ❌ and, by default, it starts again from 1.
+                    `/counting status` Current number and high score. `/counting leaderboard` Top counters.
+                    `/counting setup channel [reset-on-mistake] [allow-double]` Pick the channel and rules. *Needs Manage Server.*
+                    `/counting reset`, `/counting set-number number`, `/counting disable` *Need Manage Server.*"""),
+            new Page(BotModule.AUTO_REACT, "autoreact", "😀", "Auto-reactions",
+                    "The bot reacts to messages automatically",
+                    """
+                    `/autoreact add emojis [channel] [when] [keyword] [include-bots]` React to every message, or only ones with an image, a link or a word.
+                    `/autoreact list` Shows the rules. `/autoreact remove id` Deletes one.
+                    *Needs Manage Server.* Up to 25 rules per server, 5 emoji each."""),
             new Page(BotModule.LOGGING, "logging", "📜", "Logging",
                     "A log channel for tickets, members, moderation and more",
                     """

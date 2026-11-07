@@ -292,6 +292,8 @@ public class Database {
             rolepanels.RolePanelStore.createTables(connection);
             loa.LoaStore.createTables(connection);
             tags.TagStore.createTables(connection);
+            autoreact.AutoReactStore.createTables(connection);
+            counting.CountingStore.createTables(connection);
 
             addColumnIfMissing(connection, "welcomer", "embed_id INTEGER");
 
