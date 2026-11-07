@@ -127,7 +127,7 @@ public class Help extends ListenerAdapter implements Command {
             new Page(BotModule.COUNTING, "counting", "🔢", "Counting",
                     "A channel where everyone counts upward together",
                     """
-                    Type the next number in the counting channel. Right: ✅. Wrong or twice in a row: ❌ and, by default, it starts again from 1.
+                    Type the next number in the counting channel. Right: ✅. Wrong or twice in a row: the message is deleted and the count carries on (optionally it restarts from 1).
                     `/counting status` Current number and high score. `/counting leaderboard` Top counters.
                     `/counting setup channel [reset-on-mistake] [allow-double]` Pick the channel and rules. *Needs Manage Server.*
                     `/counting reset`, `/counting set-number number`, `/counting disable` *Need Manage Server.*"""),

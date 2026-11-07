@@ -250,8 +250,8 @@ Server Members Intent). If it is off the bot still starts, prints a message in t
 ## Counting and auto-reactions
 
 **Counting.** `/counting setup #channel` starts a game. Members post the next number alone in a message; the bot reacts
-✅ when it is right. A wrong number, or the same person twice in a row, gets ❌ and (by default) the count starts again
-from 1; use `reset-on-mistake: false` to delete the message and carry on instead. `/counting status`,
+✅ when it is right. A wrong number, or the same person twice in a row, is deleted and the count carries on; use
+`reset-on-mistake: true` if you want a mistake to start again from 1 (the bot reacts ❌ and says who ruined it). `/counting status`,
 `/counting leaderboard`, `/counting reset`, `/counting set-number` and `/counting disable` are there too. Edited or
 deleted numbers aren't tracked. It needs **Message Content Intent**.
 
