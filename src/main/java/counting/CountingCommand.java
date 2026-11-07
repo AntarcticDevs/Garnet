@@ -10,13 +10,11 @@ import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
-import net.dv8tion.jda.api.requests.ErrorResponse;
 import net.dv8tion.jda.api.requests.RestAction;
 import utils.Log;
 import utils.MessageContent;
@@ -54,7 +52,7 @@ public class CountingCommand extends ListenerAdapter implements Command {
                                         new OptionData(OptionType.CHANNEL, "channel", "Where people count", true)
                                                 .setChannelTypes(ChannelType.TEXT),
                                         new OptionData(OptionType.BOOLEAN, "reset-on-mistake",
-                                                "Start again from 1 after a mistake (default: yes)", false),
+                                                "Start again from 1 after a mistake (default: no)", false),
                                         new OptionData(OptionType.BOOLEAN, "allow-double",
                                                 "Let the same person count twice in a row (default: no)", false)),
                         new SubcommandData("status", "Show the current number and high score"),
@@ -97,8 +95,8 @@ public class CountingCommand extends ListenerAdapter implements Command {
                         event.reply("Choose a text channel.").setEphemeral(true).queue();
                         return;
                     }
-                    boolean reset = event.getOption("reset-on-mistake") == null
-                            || event.getOption("reset-on-mistake").getAsBoolean();
+                    boolean reset = event.getOption("reset-on-mistake") != null
+                            && event.getOption("reset-on-mistake").getAsBoolean();
                     boolean allowDouble = event.getOption("allow-double") != null
                             && event.getOption("allow-double").getAsBoolean();
                     CountingStore.configure(guild.getId(), channel.getId(), reset, allowDouble);

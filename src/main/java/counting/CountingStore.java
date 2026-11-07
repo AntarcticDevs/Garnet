@@ -21,7 +21,7 @@ public final class CountingStore {
         public int current;
         public int high;
         public String lastUserId;
-        public boolean resetOnMistake = true;
+        public boolean resetOnMistake;
         public boolean allowDouble;
     }
 
@@ -37,7 +37,7 @@ public final class CountingStore {
                         current INTEGER NOT NULL DEFAULT 0,
                         high INTEGER NOT NULL DEFAULT 0,
                         last_user_id TEXT,
-                        reset_on_mistake INTEGER NOT NULL DEFAULT 1,
+                        reset_on_mistake INTEGER NOT NULL DEFAULT 0,
                         allow_double INTEGER NOT NULL DEFAULT 0
                     )
                     """);
