@@ -62,11 +62,30 @@ public class Embeds extends ListenerAdapter implements Command {
                                         editCommand("add-field", "Add embed fields")
                                                 .addOption(OptionType.STRING, "field-name", "Embed field name", true)
                                                 .addOption(OptionType.STRING, "value", "Embed field value", true)
+                                ),
+                        new SubcommandGroupData("remove", "Remove content from an embed")
+                                .addSubcommands(
+                                        removeCommand("title", "Remove the title"),
+                                        removeCommand("description", "Remove the description"),
+                                        removeCommand("footer", "Remove the footer"),
+                                        removeCommand("footer-image", "Remove the footer image"),
+                                        removeCommand("image", "Remove the image"),
+                                        removeCommand("author", "Remove the author"),
+                                        removeCommand("author-image", "Remove the author image"),
+                                        removeCommand("colour", "Remove the colour"),
+                                        removeCommand("thumbnail", "Remove the thumbnail"),
+                                        removeCommand("field", "Remove a field")
+                                                .addOption(OptionType.STRING, "field-name", "Name of the field to remove", true)
                                 )
                 );
     }
 
     private static SubcommandData editCommand(String name, String description) {
+        return new SubcommandData(name, description)
+                .addOptions(embedNameOption());
+    }
+
+    private static SubcommandData removeCommand(String name, String description) {
         return new SubcommandData(name, description)
                 .addOptions(embedNameOption());
     }
@@ -96,6 +115,8 @@ public class Embeds extends ListenerAdapter implements Command {
             deleteEmbed(event);
         } else if ("edit".equals(event.getSubcommandGroup())) {
             editEmbed(event);
+        } else if ("remove".equals(event.getSubcommandGroup())) {
+            removeEmbed(event);
         } else if ("send".equals(event.getSubcommandName())) {
 
             OptionMapping option = event.getOption("channel");
@@ -148,7 +169,8 @@ public class Embeds extends ListenerAdapter implements Command {
     private static boolean isEmbedNameAutocomplete(CommandAutoCompleteInteractionEvent event) {
         return "send".equals(event.getSubcommandName())
                 || "delete".equals(event.getSubcommandName())
-                || "edit".equals(event.getSubcommandGroup());
+                || "edit".equals(event.getSubcommandGroup())
+                || "remove".equals(event.getSubcommandGroup());
     }
 
     private void createEmbed(SlashCommandInteractionEvent event) {
@@ -165,7 +187,7 @@ public class Embeds extends ListenerAdapter implements Command {
             statement.setString(1, event.getGuild().getId());
             statement.setString(2, name);
             statement.executeUpdate();
-            event.reply("Created embed `" + name + "`!").queue();
+            event.reply("Created embed `" + name + "`!").setEphemeral(true).queue();
         } catch (SQLException exception) {
             Log.error("Embeds.createEmbed failed", exception);
             event.reply("Something went wrong while creating the embed.").setEphemeral(true).queue();
@@ -244,10 +266,99 @@ public class Embeds extends ListenerAdapter implements Command {
                 return;
             }
 
-            event.reply("Updated embed `" + embedName + "`.").queue();
+            event.reply("Updated embed `" + embedName + "`.").setEphemeral(true).queue();
         } catch (SQLException exception) {
             Log.error("Embeds.addField failed", exception);
             event.reply("Something went wrong while updating the embed.").setEphemeral(true).queue();
+        }
+    }
+
+    private void removeEmbed(SlashCommandInteractionEvent event) {
+        if (event.getGuild() == null) {
+            event.reply("This command can only be used in a server.").setEphemeral(true).queue();
+            return;
+        }
+
+        String embedName = event.getOption("name").getAsString();
+        String guildId = event.getGuild().getId();
+        String subcommand = event.getSubcommandName();
+
+        if ("field".equals(subcommand)) {
+            removeField(event, guildId, embedName);
+            return;
+        }
+
+        String sql = switch (subcommand) {
+            case "title" -> "UPDATE embeds SET title = NULL WHERE guild_id = ? AND name = ?";
+            case "description" -> "UPDATE embeds SET description = NULL WHERE guild_id = ? AND name = ?";
+            case "footer" -> "UPDATE embeds SET footer_text = NULL, footer_image = NULL WHERE guild_id = ? AND name = ?";
+            case "footer-image" -> "UPDATE embeds SET footer_image = NULL WHERE guild_id = ? AND name = ?";
+            case "image" -> "UPDATE embeds SET image_url = NULL WHERE guild_id = ? AND name = ?";
+            case "author" -> "UPDATE embeds SET author_text = NULL, author_image = NULL WHERE guild_id = ? AND name = ?";
+            case "author-image" -> "UPDATE embeds SET author_image = NULL WHERE guild_id = ? AND name = ?";
+            case "colour" -> "UPDATE embeds SET colour = NULL WHERE guild_id = ? AND name = ?";
+            case "thumbnail" -> "UPDATE embeds SET thumbnail_url = NULL WHERE guild_id = ? AND name = ?";
+            default -> throw new IllegalArgumentException("Unsupported removal: " + subcommand);
+        };
+
+        try (Connection connection = Database.getConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, guildId);
+            statement.setString(2, embedName);
+
+            if (statement.executeUpdate() == 0) {
+                event.reply("No embed named `" + embedName + "` was found.").setEphemeral(true).queue();
+                return;
+            }
+
+            event.reply("Removed " + subcommand.replace('-', ' ') + " from embed `" + embedName + "`.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (SQLException exception) {
+            Log.error("Embeds.removeEmbed failed", exception);
+            event.reply("Something went wrong while removing content from the embed.")
+                    .setEphemeral(true)
+                    .queue();
+        }
+    }
+
+    private void removeField(SlashCommandInteractionEvent event, String guildId, String embedName) {
+        String fieldName = event.getOption("field-name").getAsString();
+        String findEmbedSql = "SELECT id FROM embeds WHERE guild_id = ? AND name = ?";
+        String deleteFieldSql = "DELETE FROM embed_fields WHERE embed_id = ? AND field_name = ?";
+
+        try (Connection connection = Database.getConnection();
+             PreparedStatement findEmbed = connection.prepareStatement(findEmbedSql);
+             PreparedStatement deleteField = connection.prepareStatement(deleteFieldSql)) {
+            findEmbed.setString(1, guildId);
+            findEmbed.setString(2, embedName);
+
+            try (ResultSet result = findEmbed.executeQuery()) {
+                if (!result.next()) {
+                    event.reply("No embed named `" + embedName + "` was found.").setEphemeral(true).queue();
+                    return;
+                }
+
+                deleteField.setLong(1, result.getLong("id"));
+            }
+
+            deleteField.setString(2, fieldName);
+            int removed = deleteField.executeUpdate();
+            if (removed == 0) {
+                event.reply("No field named `" + fieldName + "` was found in embed `" + embedName + "`.")
+                        .setEphemeral(true)
+                        .queue();
+                return;
+            }
+
+            event.reply("Removed " + removed + " field(s) named `" + fieldName + "` from embed `" + embedName + "`.")
+                    .setEphemeral(true)
+                    .queue();
+        } catch (SQLException exception) {
+            Log.error("Embeds.removeField failed", exception);
+            event.reply("Something went wrong while removing the embed field.")
+                    .setEphemeral(true)
+                    .queue();
         }
     }
 
@@ -338,7 +449,7 @@ public class Embeds extends ListenerAdapter implements Command {
                 }
             }
 
-            event.reply("Added a field to embed `" + embedName + "`.").queue();
+            event.reply("Added a field to embed `" + embedName + "`.").setEphemeral(true).queue();
         } catch (SQLException exception) {
             Log.error("Embeds.addField failed", exception);
             event.reply("Something went wrong while adding the embed field.").setEphemeral(true).queue();
