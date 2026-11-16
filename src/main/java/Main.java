@@ -179,4 +179,3 @@ public class Main {
         return jda;
     }
 }
-// cool
