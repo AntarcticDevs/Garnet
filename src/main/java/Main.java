@@ -168,7 +168,8 @@ public class Main {
                 throw e;
             }
             ConsoleLogger.logConsole("Couldn't connect with the Message Content Intent, so tags can't answer to "
-                    + "!name and counting / keyword auto-reactions can't read messages. To enable them, turn on \"Message Content Intent\" under Privileged Gateway Intents on "
+                    + "!name and counting / keyword auto-reactions can't read messages. To enable them, turn on "
+                    + "\"Message Content Intent\" under Privileged Gateway Intents on "
                     + "the Bot tab of your application at https://discord.com/developers/applications and restart. "
                     + "Trying again without it (/tag use still works).");
             return connect(token, listeners, false);

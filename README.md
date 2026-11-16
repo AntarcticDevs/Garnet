@@ -292,8 +292,7 @@ Roles are stored in `data/garnet.db` and keep working after restarts.
 ## Building from source
 
 ```
-git clone https://github.com/EnderKnight7op/Garnet.git
-cd Garnet
+cd GarnetDiscord
 mvn package
 ```
 

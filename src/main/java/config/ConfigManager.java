@@ -35,8 +35,8 @@ public class ConfigManager {
             database-path: ''
 
             # Turn features on or off (true = on, false = off) and restart the bot afterwards.
-            # A feature missing from this list stays on. Turning one off also removes its
-            # slash commands from Discord and hides it from /help.
+            # A feature missing from this list stays on. Turning one off also removes its slash commands
+            # from Discord and hides it from /help.
             modules:
               information: true   # /ping, /info, /userinfo, /avatar
               activity: true      # admin-only /activity

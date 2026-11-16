@@ -390,14 +390,19 @@ public class WelcomeListener extends ListenerAdapter implements Command {
 
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (resultSet.next()) {
-                    return guild.getTextChannelById(resultSet.getString("channel_id"));
+                    String channelId = resultSet.getString("channel_id");
+                    if (channelId == null || channelId.isBlank()) {
+                        return null;
+                    }
+                    return guild.getTextChannelById(channelId);
                 }
             }
         } catch (SQLException exception) {
             throw new IllegalStateException("Could not load the welcome channel", exception);
         }
 
-        return null;}
+        return null;
+    }
 
     private Long getWelcomeEmbedId(Guild guild) {
     String sql = "SELECT embed_id FROM welcomer WHERE guild_id = ?";
