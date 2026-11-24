@@ -1,10 +1,10 @@
 # Garnet
 
-Garnet is a self-hosted Discord bot engine written in Java. You run one jar, it creates its own
+You run one jar, it creates its own
 `config.yml`, you paste in your bot token, and you have your own bot with tickets, logging,
 moderation, role panels, reaction roles, leave of absence, embeds and a welcomer. Every feature can be switched on or off in the config.
 
-> Garnet is under active development. Run it on a test server first and keep backups of `data/`.
+> Garnet is under active development. Keep backups of `data/`.
 
 ## Features
 
