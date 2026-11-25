@@ -1,0 +1,24 @@
+# Bot configs (contain the token), any language folder
+config.yml
+config.yml.bak
+config.yml.tmp
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Runtime data
+data/
+
+# Java
+target/
+garnet.db
+.vscode/
+.env
+config.yml
+data/
+logs/
+
+# JavaScript (for later)
+node_modules/
