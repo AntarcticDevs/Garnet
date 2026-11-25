@@ -1,12 +1,3 @@
-"""/help: a paged help menu built with Components V2.
-
-Requires discord.py 2.6 or newer (LayoutView, Container, Section...):
-    pip install -U discord.py
-
-Only features whose module is switched on in config.yml are shown. Most pages are
-commented out for now; uncomment a page when its module is finished.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -24,7 +15,6 @@ ACCENT = discord.Colour(0x5865F2)
 
 
 def _b(text: str) -> str:
-    """Strip the indentation from a triple-quoted page body."""
     return inspect.cleandoc(text)
 
 
@@ -39,19 +29,19 @@ class Page:
 
 
 PAGES: list[Page] = [
-    Page(
-        module="information",
-        key="information",
-        emoji="ℹ️",
-        title="Information",
-        summary="Latency, server, user and avatar info",
-        body=_b("""
-            `/ping` Shows the bot's latency.
-            `/info` Shows information about this server.
-            `/userinfo [user]` Shows information about a member.
-            `/avatar [user]` Shows a member's avatar.
-        """),
-    ),
+    # Page(
+    #     module="information",
+    #     key="information",
+    #     emoji="ℹ️",
+    #     title="Information",
+    #     summary="Latency, server, user and avatar info",
+    #     body=_b("""
+    #         `/ping` Shows the bot's latency.
+    #         `/info` Shows information about this server.
+    #         `/userinfo [user]` Shows information about a member.
+    #         `/avatar [user]` Shows a member's avatar.
+    #     """),
+    # ),
     # Page(
     #     module="activity",
     #     key="activity",

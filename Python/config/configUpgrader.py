@@ -1,5 +1,3 @@
-"""Python port of the Java ConfigUpgrader. Requires PyYAML."""
-
 from __future__ import annotations
 
 import logging
@@ -9,7 +7,7 @@ from typing import NamedTuple
 
 import yaml
 
-import configManager as configManager
+from . import configManager
 
 log = logging.getLogger("config")
 

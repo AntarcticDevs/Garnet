@@ -9,8 +9,10 @@ import utils.consoleLogger
 from config import configManager
 from config import modules
 
+from pathlib import Path
 
-def loadConfig() -> str:
+
+def loadConfig() -> tuple[str, str]:
     try:
         if configManager.create_if_missing():
             print("Created config.yml. Fill in your token, save it, then start the bot again.")
@@ -31,10 +33,16 @@ def loadConfig() -> str:
     if token is None:
         print("No token set in config.yml.")
         sys.exit(1)
-    return token
+
+    botName = configManager.get_string("bot-name")
+    if botName is None:
+        print("No custom name set in config.yml for the bot, using Garnet.")
+        botName = "Garnet"
+    
+    return token, botName
 
 
-token = loadConfig()
+token, botName = loadConfig()
 
 
 class Garnet(commands.Bot):
@@ -98,6 +106,7 @@ class Garnet(commands.Bot):
                   ░░░░░░░░░   ░░░░░░░░ ░░░░░     ░░░░ ░░░░░  ░░░░░░     ░░░░░
                 """)
         print("-----------------------𝐁𝐨𝐭 𝐦𝐚𝐝𝐞 𝐛𝐲 𝐄𝐧𝐝𝐞𝐫𝐊𝐧𝐢𝐠𝐡𝐭𝟕𝐨𝐩-----------------------")
+        print(("✅ " + botName + " is online!"))
 
 
 bot = Garnet()

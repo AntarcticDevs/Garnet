@@ -1,5 +1,3 @@
-"""Python port of the Java ConfigManager (configManager.py). Requires PyYAML: pip install pyyaml"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -66,8 +64,7 @@ _config: dict[str, Any] = {}
 
 
 def add_missing_settings() -> list[str]:
-    # Java: ConfigUpgrader.run() -- that class wasn't included, so port it separately.
-    from configUpgrader import run  # type: ignore
+    from .configUpgrader import run
 
     return run()
 
