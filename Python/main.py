@@ -12,7 +12,7 @@ from config import modules
 from pathlib import Path
 
 
-def loadConfig() -> tuple[str, str]:
+def loadConfig():
     try:
         if configManager.create_if_missing():
             print("Created config.yml. Fill in your token, save it, then start the bot again.")
@@ -29,20 +29,21 @@ def loadConfig() -> tuple[str, str]:
         print(f"Config error: {e}")
         sys.exit(1)
 
+def getToken() -> str:
     token = configManager.get_string("token")
     if token is None:
         print("No token set in config.yml.")
         sys.exit(1)
+    return token
 
-    botName = configManager.get_string("bot-name")
-    if botName is None:
-        print("No custom name set in config.yml for the bot, using Garnet.")
-        botName = "Garnet"
-    
-    return token, botName
+loadConfig()
 
+token = getToken()
 
-token, botName = loadConfig()
+botName = configManager.get_bot_name()
+if botName is None:
+    print("No custom name set in config.yml for the bot, using Garnet.")
+    botName = "Garnet"
 
 
 class Garnet(commands.Bot):
